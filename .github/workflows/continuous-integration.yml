@@ -127,9 +127,10 @@ jobs:
 
     - name: Build NetCDF Fortran library
       # Unset any Fortran flags
+      # Here too it would be nice to use the environment to specify netcdf-c location
       env:
-        CPPFLAGS: -I${NCHOME}/include
-        LDFLAGS: -L${NCHOME}/lib
+        CPPFLAGS: -I/home/runner/netcdf-c/include
+        LDFLAGS: -L/home/runner/netcdf-c/lib
         FCFLAGS: -fPIC
       if: steps.cache-netcdf-fortran.outputs.cache-hit != 'true'
       run: |
