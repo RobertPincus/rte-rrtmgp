@@ -98,8 +98,8 @@ jobs:
       id: cache-netcdf-c
       uses: actions/cache@v2
       with:
-        path: /home/runner/netcdf-fortran
-        key: netcdf-c-4.7.4-${{ runner.os }}-${{ matrix.fortran-compiler }}
+        path: /home/runner/netcdf-c
+        key: netcdf-c-4.7.4a-${{ runner.os }}-${{ matrix.fortran-compiler }}
 
     - name: Install netcdf C library from source
 #      if: False
