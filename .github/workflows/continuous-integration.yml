@@ -108,8 +108,7 @@ jobs:
         echo ${CPPFLAGS}
         git clone https://github.com/Unidata/netcdf-c.git --branch v4.7.4
         cd netcdf-c
-        find /usr/lib -name "lib*df*" -print
-        CPPFLAGS=-I/usr/include/hdf5/serial LDFLAGS=-L/usr/lib/ ./configure --prefix=${NCHOME}
+        CPPFLAGS=-I/usr/include/hdf5/serial LDFLAGS=-L/usr/lib/x86_64-linux-gnu ./configure --prefix=${NCHOME}
         make -j
         sudo make install
 
