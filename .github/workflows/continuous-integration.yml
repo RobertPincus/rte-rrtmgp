@@ -90,8 +90,8 @@ jobs:
     #
     - name: Install netcdf HDF5 library
       run: |
-      sudo apt-get install libhdf5-dev libcurl4-gnutls-dev hdf5-helpers
-      dpkg -L libhdf5-dev
+        sudo apt-get install libhdf5-dev libcurl4-gnutls-dev hdf5-helpers
+        dpkg -L libhdf5-dev
 
     # Skipping this for now - netCDF configure doesn't see the HDF libararies
     - name: cache-netcdf-c
