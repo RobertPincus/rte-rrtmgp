@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 jobs:
   CI:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         fortran-compiler:  [gfortran-8, gfortran-9, ifort, nvfortran]
@@ -30,7 +30,7 @@ jobs:
       if: contains(matrix.fortran-compiler, 'gfortran-10')
       run: |
         sudo apt-get install gfortran-10 gcc-10
-        echo "::set-env name=CC::gcc-10"
+        echo "CC=gcc-10" >> $GITHUB_ENV
     #
     # Intel compilers and libraries if needed
     #   https://software.intel.com/content/www/us/en/develop/articles/oneapi-repo-instructions.html#aptpkg
@@ -45,11 +45,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install intel-hpckit-getting-started intel-oneapi-clck
         sudo apt-get install intel-oneapi-common-licensing intel-oneapi-common-vars
-        sudo apt-get install intel-oneapi-dev-utilities  intel-oneapi-dpcpp-cpp-compiler-pro
-        sudo apt-get install intel-oneapi-ifort intel-oneapi-inspector intel-oneapi-itac
-        echo "::set-env name=FC::ifort"
-        echo "::set-env name=CC::icx"
-        echo "::set-env name=FCFLAGS::-m64 -g  -traceback -heap-arrays -assume realloc_lhs -extend-source 132 -check bounds,uninit,pointers,stack -stand f08"
+        sudo apt-get install intel-oneapi-dev-utilities  intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic
+        sudo apt-get install intel-oneapi-compiler-fortran intel-oneapi-inspector intel-oneapi-itac
+        echo "FC=ifort" >> $GITHUB_ENV
+        echo "CC=icx"  >> $GITHUB_ENV
+        echo "FCFLAGS=-m64 -g  -traceback -heap-arrays -assume realloc_lhs -extend-source 132 -check bounds,uninit,pointers,stack -stand f08" >> $GITHUB_ENV
 
     # Caching cribbed from https://github.com/NCAR/ParallelIO/blob/3a77973ad5e09d354257045bf3d53827ae36a86b/.github/workflows/a3.yml#L1
     - name: cache-nvidia-compilers
@@ -58,7 +58,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: /opt/nvidia/hpc_sdk/
-        key: nvhpc-${{ runner.os }}-2020-20.7
+        key: nvhpc-${{ runner.os }}-2020-20.11
     #
     # Nvidia compilers
     #
@@ -67,17 +67,17 @@ jobs:
         NVCOMPILERS: /opt/nvidia/hpc_sdk
       if: contains(matrix.fortran-compiler, 'nvfortran') && steps.cache-nvidia-compilers.outputs.cache-hit != 'true'
       run: |
-        wget -q https://developer.download.nvidia.com/hpc-sdk/nvhpc-20-7_20.7_amd64.deb https://developer.download.nvidia.com/hpc-sdk/nvhpc-2020_20.7_amd64.deb
-        sudo apt-get install ./nvhpc-20-7_20.7_amd64.deb ./nvhpc-2020_20.7_amd64.deb
+        wget -q https://developer.download.nvidia.com/hpc-sdk/20.11/nvhpc-20-11_20.11_amd64.deb https://developer.download.nvidia.com/hpc-sdk/20.11/nvhpc-2020_20.11_amd64.deb
+        sudo apt-get install ./nvhpc-20-11_20.11_amd64.deb ./nvhpc-2020_20.11_amd64.deb
     - name: Nvidia environment
       env:
         NVCOMPILERS: /opt/nvidia/hpc_sdk
       if: contains(matrix.fortran-compiler, 'nvfortran')
       run: |
-        echo "::set-env name=FC::nvfortran"
-        echo "::set-env name=CC::nvc"
-        echo "::set-env name=FCFLAGS::-Mallocatable=03 -Mstandard -Mbounds -Mchkptr -Kieee -Mchkstk"
-        echo "::add-path::${NVCOMPILERS}/Linux_x86_64/20.7/compilers/bin"
+        echo "FC=nvfortran" >> $GITHUB_ENV
+        echo "CC=nvc"       >> $GITHUB_ENV
+        echo "FCFLAGS=-Mallocatable=03 -Mstandard -Mbounds -Mchkptr -Kieee -Mchkstk" >> $GITHUB_ENV
+        echo "${NVCOMPILERS}/Linux_x86_64/20.11/compilers/bin" >> $GITHUB_PATH
     ############################################################################
     # Netcdf C and Fortran
     #
@@ -130,13 +130,15 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v2
 
+    - name: Environmental variables
+      run: |
+        echo "RRTMGP_ROOT=${GITHUB_WORKSPACE}"        >> $GITHUB_ENV
+        echo "RRTMGP_BUILD=${GITHUB_WORKSPACE}/build" >> $GITHUB_ENV
+
     - name: Make library, examples, tests
       env:
         RTE_KERNELS: ${{ matrix.rte-kernels }}
       run: |
-        echo "::set-env name=RRTMGP_ROOT::${GITHUB_WORKSPACE}"
-        export RRTMGP_ROOT=${GITHUB_WORKSPACE}
-        export RRTMGP_BUILD=${RRTMGP_ROOT}/build
         source /opt/intel/oneapi/setvars.sh || true
         cd ${RRTMGP_ROOT}
         ${FC} --version
