@@ -14,7 +14,7 @@ jobs:
       # Defaults for gfortran, over-ridden below
       FCFLAGS: "-ffree-line-length-none -m64 -std=f2008 -march=native -fbounds-check -finit-real=nan -DUSE_CBOOL"
       CC: gcc
-      NCHOME: /usr
+      NCHOME: /home/runner/netcdf-c
       NFHOME: /home/runner/netcdf-fortran
       RFMIP_DIR: /home/runner/rfmip-files
     steps:
@@ -34,7 +34,8 @@ jobs:
     #
     # Intel compilers and libraries if needed
     #   https://software.intel.com/content/www/us/en/develop/articles/oneapi-repo-instructions.html#aptpkg
-    # Trying list of packages from https://github.com/intel/oneapi-containers/blob/master/images/docker/hpckit-devel-ubuntu18.04/Dockerfile
+    #   Trying list of packages from https://github.com/intel/oneapi-containers/blob/master/images/docker/hpckit-devel-ubuntu18.04/Dockerfile
+    #   Better examples are probably at https://github.com/oneapi-src/oneapi-ci
     #
     - name: Intel setup compilers, environment
       if: contains(matrix.fortran-compiler, 'ifort')
@@ -87,12 +88,20 @@ jobs:
     #    but I don't know how to use it
     # Nor have I been able to figure out how to build it from source
     #
-    - name: Install netcdf C library
-      run: sudo apt-get install libnetcdf-dev
+    - name: Install netcdf HDF5 library
+      run: sudo apt-get install libhdf5-dev
 
     # Skipping this for now - netCDF configure doesn't see the HDF libararies
-    - name: Upgrade netcdf C library from source
-      if: False
+    - name: cache-netcdf-c
+      id: cache-netcdf-c
+      uses: actions/cache@v2
+      with:
+        path: /home/runner/netcdf-fortran
+        key: netcdf-c-4.7.4-${{ runner.os }}-${{ matrix.fortran-compiler }}
+
+    - name: Install netcdf C library from source
+#      if: False
+      if: steps.cache-netcdf-c.outputs.cache-hit != 'true'
       run: |
         source /opt/intel/oneapi/setvars.sh || true
         ${CC} --version
