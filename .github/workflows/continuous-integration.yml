@@ -89,7 +89,7 @@ jobs:
     # Nor have I been able to figure out how to build it from source
     #
     - name: Install netcdf HDF5 library
-      run: sudo apt-get install libhdf5-dev
+      run: sudo apt-get install libhdf5-dev curl
 
     # Skipping this for now - netCDF configure doesn't see the HDF libararies
     - name: cache-netcdf-c
