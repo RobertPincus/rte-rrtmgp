@@ -128,8 +128,8 @@ jobs:
     - name: Build NetCDF Fortran library
       # Unset any Fortran flags
       env:
-        CPPFLAGS: -I${NCHOME}
-        LDFLAGS: -L${NCHOME}
+        CPPFLAGS: -I${NCHOME}/include
+        LDFLAGS: -L${NCHOME}/lib
         FCFLAGS: -fPIC
       if: steps.cache-netcdf-fortran.outputs.cache-hit != 'true'
       run: |
@@ -138,6 +138,7 @@ jobs:
         ${FC} --version
         git clone https://github.com/Unidata/netcdf-fortran.git --branch v4.4.4
         cd netcdf-fortran
+        echo ${CPPFLAGS}
         ./configure --prefix=${NFHOME}
         make -j
         sudo make install
