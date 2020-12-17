@@ -88,7 +88,7 @@ jobs:
     #    but I don't know how to use it
     # Nor have I been able to figure out how to build it from source
     #
-    - name: Install netcdf HDF5 library
+    - name: Install HDF5 library
       run: |
         sudo apt-get install libhdf5-dev libcurl4-gnutls-dev hdf5-helpers
         dpkg -L libhdf5-dev
@@ -106,7 +106,7 @@ jobs:
       if: steps.cache-netcdf-c.outputs.cache-hit != 'true'
       env:
         CPPFLAGS: -I/usr/include/hdf5/serial
-        LDFLAGS: -L/usr/lib/x86_64-linux-gnu
+        LDFLAGS: -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
       run: |
         source /opt/intel/oneapi/setvars.sh || true
         ${CC} --version
