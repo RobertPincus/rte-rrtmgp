@@ -102,13 +102,17 @@ jobs:
     - name: Install netcdf C library from source
 #      if: False
       if: steps.cache-netcdf-c.outputs.cache-hit != 'true'
+      env:
+        CPPFLAGS: -I/usr/include/hdf5/serial
+        LDFLAGS: -L/usr/lib/x86_64-linux-gnu
       run: |
         source /opt/intel/oneapi/setvars.sh || true
         ${CC} --version
         echo ${CPPFLAGS}
         git clone https://github.com/Unidata/netcdf-c.git --branch v4.7.4
         cd netcdf-c
-        CPPFLAGS=-I/usr/include/hdf5/serial LDFLAGS=-L/usr/lib/x86_64-linux-gnu ./configure --prefix=${NCHOME}
+        ls /usr/include
+        ./configure --prefix=${NCHOME}
         make -j
         sudo make install
 
