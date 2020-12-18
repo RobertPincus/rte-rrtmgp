@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        fortran-compiler:  [gfortran-8, gfortran-9, ifort, nvfortran]
+        fortran-compiler:  [gfortran-8, gfortran-9, gfortran-10, ifort, nvfortran]
         # I'd like to add gfortran-10 to this list but have version issues with netcdf as below
         rte-kernels: [default, openacc]
     env:
@@ -80,13 +80,8 @@ jobs:
         echo "FCFLAGS=-Mallocatable=03 -Mstandard -Mbounds -Mchkptr -Kieee -Mchkstk" >> $GITHUB_ENV
         echo "${NVCOMPILERS}/Linux_x86_64/20.11/compilers/bin" >> $GITHUB_PATH
     ############################################################################
-    # Netcdf C and Fortran
     #
-    # I would love to install libnetcdf-dev 4.7.4 to be compatible with
-    #  netcdf-fortran 4.5.3, which then supports gfortran-10.
-    # 4.7.4 is in the groovy set of packages: https://packages.ubuntu.com/groovy/libnetcdf-dev
-    #    but I don't know how to use it
-    # Nor have I been able to figure out how to build it from source
+    # Netcdf C and Fortran
     #
     - name: Install HDF5 library
       run: |
