@@ -137,7 +137,7 @@ jobs:
         echo ${TEST}
         source /opt/intel/oneapi/setvars.sh || true
         ${FC} --version
-#        git clone https://github.com/Unidata/netcdf-fortran.git --branch v4.5.3
+        #        git clone https://github.com/Unidata/netcdf-fortran.git --branch v4.5.3
         git clone https://github.com/Unidata/netcdf-fortran.git --branch v4.4.4
         cd netcdf-fortran
         echo ${CPPFLAGS}
