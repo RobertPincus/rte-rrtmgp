@@ -825,10 +825,10 @@ contains
     logical(wl),                             intent(in   ) :: top_at_1
     real(wp), dimension(ncol),               intent(in   ) :: mu0
     real(wp), dimension(ncol, nlay  ), intent(in   ) :: tau, w0, g
-    real(wp), dimension(ncol        ), intent(in   ) :: sfc_albedo          ! surface albedo for direct radiation
+    real(wp), dimension(ncol        ), intent(in   ) :: sfc_albedo        ! surface albedo for direct radiation
     real(wp), dimension(ncol, nlay  ), intent(out  ) :: source_dn, source_up
-    real(wp), dimension(ncol        ), intent(out  ) :: source_sfc          ! Source function for upward radation at surface
-    real(wp), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir ! Direct beam flux
+    real(wp), dimension(ncol        ), intent(out  ) :: source_sfc        ! Source function for upward radiation at surface
+    real(wp), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir       ! Direct beam flux
                                                                           ! intent(inout) because top layer includes incident flux
     real(wp), dimension(ncol, nlay  ), intent(out  ) :: Rdif, Tdif
 
@@ -842,9 +842,9 @@ contains
                                      tau (icol,ilev), w0  (icol,ilev), g(icol,ilev), &
                                      Rdif(icol,ilev), Tdif(icol,ilev),               &
                                      Rdir, Tdir, Tnoscat)
-          source_up      (icol,ilev) =   Rdir    * flux_dn_dir_inc(icol,ilev)
-          source_dn      (icol,ilev) =   Tdir    * flux_dn_dir_inc(icol,ilev)
-          flux_dn_dir_trn(icol,ilev+1) = Tnoscat * flux_dn_dir_inc(icol,ilev)
+          source_up  (icol,ilev) =   Rdir    * flux_dn_dir(icol,ilev)
+          source_dn  (icol,ilev) =   Tdir    * flux_dn_dir(icol,ilev)
+          flux_dn_dir(icol,ilev+1) = Tnoscat * flux_dn_dir(icol,ilev)
 !          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
 !                                     flux_dn_dir(icol,ilev  ), &
 !                                     source_up  (icol,ilev  ), &
@@ -862,9 +862,9 @@ contains
                                      tau (icol,ilev), w0  (icol,ilev), g(icol,ilev), &
                                      Rdif(icol,ilev), Tdif(icol,ilev),               &
                                      Rdir, Tdir, Tnoscat)
-          source_up      (icol,ilev) = Rdir    * flux_dn_dir_inc(icol,ilev)
-          source_dn      (icol,ilev) = Tdir    * flux_dn_dir_inc(icol,ilev)
-          flux_dn_dir_trn(icol,ilev) = Tnoscat * flux_dn_dir_inc(icol,ilev+1)
+          source_up  (icol,ilev) = Rdir    * flux_dn_dir(icol,ilev+1)
+          source_dn  (icol,ilev) = Tdir    * flux_dn_dir(icol,ilev+1)
+          flux_dn_dir(icol,ilev) = Tnoscat * flux_dn_dir(icol,ilev+1)
 !          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
 !                                     flux_dn_dir(icol,ilev+1), &
 !                                     source_up  (icol,ilev  ), &
