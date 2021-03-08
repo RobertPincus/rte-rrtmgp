@@ -842,11 +842,14 @@ contains
                                      tau (icol,ilev), w0  (icol,ilev), g(icol,ilev), &
                                      Rdif(icol,ilev), Tdif(icol,ilev),               &
                                      Rdir, Tdir, Tnoscat)
-          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
-                                     flux_dn_dir(icol,ilev  ), &
-                                     source_up  (icol,ilev  ), &
-                                     source_dn  (icol,ilev  ), &
-                                     flux_dn_dir(icol,ilev+1) )
+          source_up      (icol,ilev) =   Rdir    * flux_dn_dir_inc(icol,ilev)
+          source_dn      (icol,ilev) =   Tdir    * flux_dn_dir_inc(icol,ilev)
+          flux_dn_dir_trn(icol,ilev+1) = Tnoscat * flux_dn_dir_inc(icol,ilev)
+!          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
+!                                     flux_dn_dir(icol,ilev  ), &
+!                                     source_up  (icol,ilev  ), &
+!                                     source_dn  (icol,ilev  ), &
+!                                     flux_dn_dir(icol,ilev+1) )
         end do
         source_sfc(icol) = flux_dn_dir(icol,nlay+1)*sfc_albedo(icol)
       end do
@@ -859,11 +862,14 @@ contains
                                      tau (icol,ilev), w0  (icol,ilev), g(icol,ilev), &
                                      Rdif(icol,ilev), Tdif(icol,ilev),               &
                                      Rdir, Tdir, Tnoscat)
-          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
-                                     flux_dn_dir(icol,ilev+1), &
-                                     source_up  (icol,ilev  ), &
-                                     source_dn  (icol,ilev  ), &
-                                     flux_dn_dir(icol,ilev  ) )
+          source_up      (icol,ilev) = Rdir    * flux_dn_dir_inc(icol,ilev)
+          source_dn      (icol,ilev) = Tdir    * flux_dn_dir_inc(icol,ilev)
+          flux_dn_dir_trn(icol,ilev) = Tnoscat * flux_dn_dir_inc(icol,ilev+1)
+!          call sw_source_2str_scalar(Rdir, Tdir, Tnoscat,      &
+!                                     flux_dn_dir(icol,ilev+1), &
+!                                     source_up  (icol,ilev  ), &
+!                                     source_dn  (icol,ilev  ), &
+!                                     flux_dn_dir(icol,ilev  ) )
 
         end do
         source_sfc(icol) = flux_dn_dir(icol,    1)*sfc_albedo(icol)
