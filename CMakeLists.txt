@@ -59,6 +59,7 @@ endif()
 add_subdirectory(rte)
 add_subdirectory(rrtmgp)
 add_subdirectory(ssm)
+add_subdirectory(fjx)
 
 include(CTest)
 if(RTE_BUILD_TESTING)
