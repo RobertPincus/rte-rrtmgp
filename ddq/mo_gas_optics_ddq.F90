@@ -149,11 +149,28 @@ contains
                                                  tlev     !! level temperatures [K]l (ncol,nlay+1)
     ! --------------
     integer :: ncol, nlay, nnu
-    ! --------------
+    real(wp), dimension(   ncol,nlay+1), target  :: tlev_arr
+    real(wp), dimension(:,:),            pointer :: tlev_wk
+    ! ----------------------------------------------------------
     error_msg = ""
+    !
+    ! Source function needs temperature at interfaces/levels and at layer centers
+    !   Allocate small local array for tlev unconditionally
+    !
     ncol = size(play,1)
     nlay = size(play,2)
-    nnu  = this%get_ngpt() ! How does this work?
+    nnu  = this%get_ngpt()
+
+    if (present(tlev)) then
+      !   Users might have provided these
+      tlev_wk => tlev
+    else
+      tlev_arr = interp_tlev_from_tlay(ncol, nlay, tlay, play, plev)
+      tlev_wk => tlev_arr
+    end if
+    ! --------------
+
+    call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
     ! Compute layer number here
     !   get_col_dry returns number density per cm^2
@@ -181,15 +198,8 @@ contains
     call compute_Planck_source(ncol, nlay, nnu,              &
                                this%nus, this%weights, tlay, &
                                sources%lay_source)
-    ! This will fail if Tlev isn't provided
-    !   There's interpolation code in RRTMGP gas optics -
-    !   should we make this generic and package it with the gas optics type?
-    if(.not. present(tlev)) then
-      error_msg = "tlev required for DDQ! (someone should fix this)"
-      return
-    end if
     call compute_Planck_source(ncol, nlay+1, nnu,            &
-                               this%nus, this%weights, tlev, &
+                               this%nus, this%weights, tlev_wk, &
                                sources%lev_source)
     call compute_Planck_source(ncol,         nnu,            &
                                this%nus, this%weights, tsfc, &

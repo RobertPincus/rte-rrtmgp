@@ -24,7 +24,7 @@ module mo_gas_optics_utils
   end interface
 
   private :: B_nu
-  public  :: compute_Planck_source, get_layer_mass, get_layer_number
+  public  :: compute_Planck_source, get_layer_number, interp_tlev_from_tlay
 
 contains
   ! -------------------------------------------------------------------------------------------------
@@ -94,36 +94,8 @@ contains
 
   end subroutine compute_Planck_source_1D
   ! -------------------------------------------------------------------------------------------------
-  ! Layer mass (kg), layer number density
+  ! layer number density
   ! -------------------------------------------------------------------------------------------------
-  subroutine get_layer_mass(ncol, nlay, ngas, vmr, plev, mol_weights, m_dry, layer_mass)
-    !
-    !> mass (kg m^-2) each gas in the layer
-    !>
-    integer, intent(in)                                  :: ncol, nlay, ngas
-    real(wp), dimension(ngas, ncol, nlay  ), intent(in ) :: vmr
-    real(wp), dimension(      ncol, nlay+1), intent(in ) :: plev
-    real(wp), dimension(ngas),               intent(in ) :: mol_weights
-    real(wp),                                intent(in ) :: m_dry
-    real(wp), dimension(ngas, ncol, nlay),   intent(out) :: layer_mass
-
-    integer :: igas, icol, ilay
-    ! Convert pressures and vmr to layer masses (ngas, ncol, nlay)
-    ! mmr = vmr * (Mgas/Mair)
-    ! layer_mass = mmr * dp / g
-    !$acc                         parallel loop    collapse(3) copyin(vmr,mol_weights,plev)  copyout(layer_mass)
-    !$omp target teams distribute parallel do simd collapse(3) map(to:vmr,mol_weights,plev) map(from:layer_mass)
-    do ilay = 1, nlay
-      do icol = 1, ncol
-        do igas = 1, ngas
-          layer_mass(igas, icol, ilay) = vmr(igas, icol, ilay) * &
-            (mol_weights(igas) / m_dry) * &
-            abs(plev(icol, ilay+1) - plev(icol, ilay)) / grav
-        end do
-      end do
-    end do
-  end subroutine get_layer_mass
-  !--------------------------------------------------------------------------------------------------------------------
   function get_layer_number(ncol, nlay, vmr_h2o, plev) result(col_dry)
     !
     !> Number density (#/cm^-2) of dry air molecules
@@ -150,4 +122,34 @@ contains
       end do
     end do
   end function get_layer_number
+  ! -------------------------------------------------------------------------------------------------
+  ! interpolate temperature at levels from value at layer centers
+  ! -------------------------------------------------------------------------------------------------
+  function interp_tlev_from_tlay(ncol, nlay, tlay, play, plev) result(tlev)
+    integer,  intent(in) :: ncol, nlay
+    real(wp), intent(in) :: tlay(ncol, nlay), play(ncol, nlay), plev(ncol, nlay+1)
+    real(wp) :: tlev(ncol, nlay+1)
+
+    integer :: icol, ilay
+    !$acc                parallel loop gang vector
+    !$omp target teams distribute parallel do simd
+    do icol = 1, ncol
+      tlev(icol,1)      = tlay(icol,1) &
+                         + (plev(icol,1)-play(icol,1))*(tlay(icol,2)-tlay(icol,1))  &
+                                                        / (play(icol,2)-play(icol,1))
+      tlev(icol,nlay+1) = tlay(icol,nlay)                                                             &
+                        + (plev(icol,nlay+1)-play(icol,nlay))*(tlay(icol,nlay)-tlay(icol,nlay-1))  &
+                                                  / (play(icol,nlay)-play(icol,nlay-1))
+      end do
+     !$acc                parallel loop gang vector collapse(2)
+     !$omp target teams distribute parallel do simd collapse(2)
+     do ilay = 2, nlay
+        do icol = 1, ncol
+           tlev(icol,ilay) = (play(icol,ilay-1)*tlay(icol,ilay-1)*(plev(icol,ilay  )-play(icol,ilay)) &
+                           +  play(icol,ilay  )*tlay(icol,ilay  )*(play(icol,ilay-1)-plev(icol,ilay))) /  &
+                             (plev(icol,ilay)*(play(icol,ilay-1) - play(icol,ilay)))
+        end do
+      end do
+    end function interp_tlev_from_tlay
+  ! -------------------------------------------------------------------------------------------------
 end module mo_gas_optics_utils

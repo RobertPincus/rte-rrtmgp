@@ -34,7 +34,7 @@ module mo_gas_optics_rrtmgp
                              only: interpolation, compute_tau_absorption, compute_tau_rayleigh, compute_Planck_source
   use mo_gas_optics_constants,   only: avogad, m_dry, m_h2o, grav
   use mo_gas_optics_util_string, only: lower_case, string_in_array, string_loc_in_array
-  use mo_gas_optics_utils,   only: get_col_dry => get_layer_number
+  use mo_gas_optics_utils,   only: get_col_dry => get_layer_number, interp_tlev_from_tlay
   use mo_gas_concentrations, only: ty_gas_concs
   use mo_optical_props,      only: ty_optical_props_arry, ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
   use mo_gas_optics,         only: ty_gas_optics
@@ -885,30 +885,8 @@ contains
       !   Users might have provided these
       tlev_wk => tlev
     else
+      tlev_arr = interp_tlev_from_tlay(ncol, nlay, tlay, play, plev)
       tlev_wk => tlev_arr
-      !
-      ! Interpolate temperature to levels if not provided
-      !   Interpolation and extrapolation at boundaries is weighted by pressure
-      !
-     !$acc                parallel loop gang vector
-     !$omp target teams distribute parallel do simd
-      do icol = 1, ncol
-         tlev_arr(icol,1)      = tlay(icol,1) &
-                           + (plev(icol,1)-play(icol,1))*(tlay(icol,2)-tlay(icol,1))  &
-                                                          / (play(icol,2)-play(icol,1))
-         tlev_arr(icol,nlay+1) = tlay(icol,nlay)                                                             &
-                                + (plev(icol,nlay+1)-play(icol,nlay))*(tlay(icol,nlay)-tlay(icol,nlay-1))  &
-                                                          / (play(icol,nlay)-play(icol,nlay-1))
-      end do
-     !$acc                parallel loop gang vector collapse(2)
-     !$omp target teams distribute parallel do simd collapse(2)
-     do ilay = 2, nlay
-        do icol = 1, ncol
-           tlev_arr(icol,ilay) = (play(icol,ilay-1)*tlay(icol,ilay-1)*(plev(icol,ilay  )-play(icol,ilay)) &
-                                +  play(icol,ilay  )*tlay(icol,ilay  )*(play(icol,ilay-1)-plev(icol,ilay))) /  &
-                                  (plev(icol,ilay)*(play(icol,ilay-1) - play(icol,ilay)))
-        end do
-      end do
     end if
 
     !-------------------------------------------------------------------
