@@ -4,7 +4,7 @@ module mo_gas_optics_ddq_kernels
 
   implicit none
   private
-  public :: compute_tau_absorption
+  public :: tau_absorption_from_fits
 
 contains
   !--------------------------------------------------------------------------------------------------------------------
@@ -12,7 +12,7 @@ contains
   ! Compute absorption optical depth from second-order polynomial approximations
   !    for absorption cross-section
   !
-  subroutine compute_tau_absorption(ncol, nlay, nnu, ngas, &
+  subroutine tau_absorption_from_fits(ncol, nlay, nnu, ngas, &
                   nus, &
                   play, tlay, dry_num, vmrs, &
                   fax_ngas, fax_num_index, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
@@ -118,5 +118,5 @@ contains
         end do
       end do
     end do
-  end subroutine compute_tau_absorption
+  end subroutine tau_absorption_from_fits
 end module mo_gas_optics_ddq_kernels

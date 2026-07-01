@@ -34,9 +34,9 @@ module mo_gas_optics_ddq
                                    ty_optical_props_2str, &
                                    ty_optical_props_nstr
   use mo_gas_optics,         only: ty_gas_optics
-  use mo_gas_optics_utils,   only: compute_Planck_source, get_layer_number
+  use mo_gas_optics_utils,   only: compute_Planck_source, get_layer_number, interp_tlev_from_tlay
   use mo_gas_optics_ddq_kernels, &
-                             only: compute_tau_absorption
+                             only: tau_absorption_from_fits
   implicit none
   private
   public :: ty_gas_optics_ddq
@@ -59,12 +59,12 @@ module mo_gas_optics_ddq
     ! Temperature dependence of absorption coefficients
     !
     real(wp), allocatable :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
-    real(wp)              :: fax_T0
+    real(wp), allocatable :: fax_T0(:) ! (nspecies)
     !
     ! Pressure dependence
     !
     real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
-    real(wp)              :: fax_p0
+    real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     !
     ! Reference cross-section, self-broadening factor
     !
@@ -149,8 +149,8 @@ contains
                                                  tlev     !! level temperatures [K]l (ncol,nlay+1)
     ! --------------
     integer :: ncol, nlay, nnu
-    real(wp), dimension(   ncol,nlay+1), target  :: tlev_arr
-    real(wp), dimension(:,:),            pointer :: tlev_wk
+    real(wp), dimension(size(plev,1),size(plev,2)), target  :: tlev_arr
+    real(wp), dimension(:,:),                       pointer :: tlev_wk
     ! ----------------------------------------------------------
     error_msg = ""
     !
@@ -161,15 +161,7 @@ contains
     nlay = size(play,2)
     nnu  = this%get_ngpt()
 
-    if (present(tlev)) then
-      !   Users might have provided these
-      tlev_wk => tlev
-    else
-      tlev_arr = interp_tlev_from_tlay(ncol, nlay, tlay, play, plev)
-      tlev_wk => tlev_arr
-    end if
     ! --------------
-
     call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
     ! Compute layer number here
@@ -193,8 +185,14 @@ contains
     end select
 
     !
-    ! Planck function sources
+    ! Planck function sources, interpolating tlev from tlay if necessary
     !
+    if (present(tlev)) then
+      tlev_wk => tlev
+    else
+      tlev_arr = interp_tlev_from_tlay(ncol, nlay, tlay, play, plev)
+      tlev_wk => tlev_arr
+    end if
     call compute_Planck_source(ncol, nlay, nnu,              &
                                this%nus, this%weights, tlay, &
                                sources%lay_source)
@@ -208,6 +206,100 @@ contains
     call zero_array(ncol, nnu, sources%sfc_source_Jac)
 
   end function gas_optics_int
+  !--------------------------------------------------------------------------------------------------------------------
+  !
+  ! Absorption optical depth
+  !
+  subroutine compute_tau_absorption(this,             &
+                          play, plev, tlay, gas_desc, &
+                          tau_abs, col_dry)
+    class(ty_gas_optics_ddq),   intent(in ) :: this
+    real(wp), dimension(:,:),   intent(in ) :: play, &   !! layer pressures [Pa, mb]; (ncol,nlay)
+                                               plev, &   !! level pressures [Pa, mb]; (ncol,nlay+1)
+                                               tlay      !! layer temperatures [K]; (ncol,nlay)
+    type(ty_gas_concs),         intent(in ) :: gas_desc  !! Gas volume mixing ratios
+    real(wp), dimension(:,:,:), intent(out) :: tau_abs   !! Cabsorption optical depth; (ncol,nlay,nnu)
+    real(wp), dimension(:,:),   intent(in   ), &
+                           optional, target :: col_dry     !! Column dry amount (molecules/cm^2); dim(ncol,nlay)
+    ! -----------------------
+    real(wp), dimension(size(play, 1),size(play, 2)), &
+                                    target  :: dry_num_arr
+    real(wp), dimension(:,:),       pointer :: dry_num
+    real(wp), dimension(:,:,:), allocatable :: vmrs
+    integer,  dimension(:),     allocatable :: temp
+    integer,  dimension(size(this%fax_species_names))   ::   fax_num_index
+    integer,  dimension(size(this%xsec_species_names))  ::  xsec_num_index
+    integer,  dimension(size(this%mtckd_species_names)) :: mtckd_num_index
+    character(len=32), &
+              dimension(:), allocatable     :: temp_gas_names
+    character(len=8), &                        ! Gases provided by users; union of these with known gases
+              dimension(:), allocatable     :: provided_gases, gases_to_use
+    character(len=128)                      :: error_msg
+    integer :: ncol, nlay, ngas
+    integer :: igas, idx_h2o
+    ! -----------------------------------------------------------
+    ncol = size(play, 1)
+    nlay = size(play, 2)
+
+    ! allocate on assignment
+    temp_gas_names(:) = gas_desc%get_gas_names()
+    ! Which gases does the user provide?
+    provided_gases(:) = [(trim(temp_gas_names(igas)), &
+                          igas = 1, size(temp_gas_names))]
+    ! Which gases does the user provide that the scheme knows about?
+    gases_to_use = pack(provided_gases, &
+                        mask = [(string_in_array(provided_gases(igas), &
+                                                 this%species_names),  &
+                                 igas = 1, size(provided_gases))])
+    ! vmr array, index 0 is the
+    allocate(vmrs( 0:size(gases_to_use), ncol, nlay))
+    call zero_array(ncol, nlay, vmrs(0,:,:))
+    do igas = 1, ngas
+      error_msg = gas_desc%get_vmr(gases_to_use(igas), vmrs(igas,:,:))
+      if (error_msg /= "") return
+    end do
+
+    fax_num_index = [(max(string_loc_in_array(this%fax_species_names(igas), &
+                                              gases_to_use),                &
+                          0), &
+                     igas = 1, size(this%fax_species_names) &
+                    )]
+    xsec_num_index = [(max(string_loc_in_array(this%xsec_species_names(igas), &
+                                               gases_to_use),                &
+                          0), &
+                       igas = 1, size(this%xsec_species_names) &
+                     )]
+    mtckd_num_index = [(max(string_loc_in_array(this%mtckd_species_names(igas), &
+                                                gases_to_use),                &
+                            0), &
+                        igas = 1, size(this%mtckd_species_names) &
+                      )]
+
+    if (present(col_dry)) then
+      !$acc        enter data copyin(col_dry)
+      !$omp target enter data map(to:col_dry)
+      dry_num => col_dry
+    else
+      !$acc        enter data create(   col_dry_arr)
+      !$omp target enter data map(alloc:col_dry_arr)
+      dry_num => dry_num_arr
+      idx_h2o = string_loc_in_array("h2o", gases_to_use)
+      dry_num_arr = get_layer_number(ncol, nlay,       &
+                                     vmrs(idx_h2o,:,:), &
+                                     plev) ! dry air column amounts computation
+    end if
+
+    call tau_absorption_from_fits(ncol, nlay, this%get_ngpt(), ngas, &
+                  this%nus, &
+                  play, tlay, dry_num, vmrs, &
+                  size(fax_num_index), fax_num_index,   &
+                  this%fax_a, this%fax_b, this%fax_T0, this%fax_c, this%fax_p0, this%fax_sigma0, this%fax_S, &
+                  size(xsec_num_index), xsec_num_index,  &
+                  this%xsec_p,                           &
+                  size(mtckd_num_index), mtckd_num_index, &
+                  this%mtckd_cself, this%mtckd_cfrgn, this%mtckd_n, this%mtckd_T0, this%mtckd_p0, &
+                  tau_abs)
+  end subroutine compute_tau_absorption
   !--------------------------------------------------------------------------------------------------------------------
   !
   ! Initialiation
@@ -227,9 +319,9 @@ contains
     ! Functional approximations to cross-sections (fax) for line absorption
     character(len=*), intent(in) :: fax_species_names(:)
     real(wp), intent(in) :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
-    real(wp), intent(in) :: fax_T0
+    real(wp), intent(in) :: fax_T0(:)       ! (nspecies)
     real(wp), intent(in) :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
-    real(wp), intent(in) :: fax_p0
+    real(wp), intent(in) :: fax_p0(:)       ! (nspecies)
     real(wp), intent(in) :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), intent(in) :: fax_S(:)        ! (     nspecies), self-broadening coefficients
     ! -------------------------------------
