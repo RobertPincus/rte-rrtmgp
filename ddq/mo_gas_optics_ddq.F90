@@ -41,6 +41,7 @@ module mo_gas_optics_ddq
   private
   public :: ty_gas_optics_ddq
 
+  integer, parameter :: gas_name_len = 8
   ! -------------------------------------------------------------------------------------------------
   type, extends(ty_gas_optics), public :: ty_gas_optics_ddq
     private
@@ -54,7 +55,8 @@ module mo_gas_optics_ddq
     ! Functional approximations to cross-sections (fax) for line absorption
     ! -------------------------------------
     ! Which gases?
-    character(len=8), allocatable :: fax_species_names(:)
+    character(len=gas_name_len), &
+             allocatable :: fax_species_names(:)
     !
     ! Temperature dependence of absorption coefficients
     !
@@ -73,16 +75,19 @@ module mo_gas_optics_ddq
     ! -------------------------------------
     ! cross-section fits (xsec)
     ! -------------------------------------
-    character(len=8), allocatable :: xsec_species_names(:)
-    real(wp),         allocatable :: xsec_p(:,:,:) ! (0:3, nspecies, nnu), (const, T, T^2, p scaling of cross-section)
+    character(len=gas_name_len), &
+              allocatable :: xsec_species_names(:)
+    real(wp), allocatable :: xsec_p(:,:,:) ! (0:3, nspecies, nnu), (const, T, T^2, p scaling of cross-section)
     ! -------------------------------------
     ! MT_CKD continuum absorption (mtckd)
-    character(len=8), allocatable :: mtckd_species_names(:)
-    real(wp),         allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
-    real(wp)                      :: mtckd_T0, mtckd_p0
+    character(len=gas_name_len), &
+              allocatable :: mtckd_species_names(:)
+    real(wp), allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
+    real(wp)              :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Unique list of all gases known to the class
-    character(len=8), allocatable :: species_names(:)
+    character(len=gas_name_len), &
+              allocatable :: species_names(:)
   contains
     procedure, public :: source_is_internal
     procedure, public :: source_is_external
@@ -123,6 +128,60 @@ contains
     ! Optional inputs
     real(wp), dimension(:,:), intent(in   ), &
                            optional, target :: col_dry !! Column dry amount (molecules/cm^2); dim(ncol,nlay)
+    ! --------------
+    integer :: ncol, nlay, nnu
+    integer :: icol, inu
+    ! ----------------------------------------------------------
+    error_msg = ""
+    !
+    ! Source function needs temperature at interfaces/levels and at layer centers
+    !   Allocate small local array for tlev unconditionally
+    !
+    ncol = size(play,1)
+    nlay = size(play,2)
+    nnu  = this%get_ngpt()
+
+    ! --------------
+    call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
+
+    ! Absoption optical depth
+    error_msg =  compute_tau_absorption(this,   &
+                    play, plev, tlay, gas_desc, &
+                    optical_props%tau, col_dry)
+
+    ! Revisit after Rayleigh scattering is complete
+    select type(optical_props)
+      type is (ty_optical_props_2str)
+        call zero_array(ncol, nlay, nnu, optical_props%ssa)
+        call zero_array(ncol, nlay, nnu, optical_props%g)
+      type is (ty_optical_props_nstr)
+        call zero_array(ncol, nlay, nnu, optical_props%ssa)
+        call zero_array(optical_props%get_nmom(), &
+                      ncol, nlay, nnu, optical_props%p)
+    end select
+
+    ! ----------------------------------------------------------
+    !
+    ! External source function is constant
+    !
+    !$acc enter data create(toa_src)
+    !$omp target enter data map(alloc:toa_src)
+    if(check_extents) then
+      if(.not. extents_are(toa_src, ncol, nnu)) &
+        error_msg = "gas_optics(): array toa_src has wrong size"
+    end if
+    if(error_msg  /= '') return
+
+    !$acc parallel loop collapse(2)
+    !$omp target teams distribute parallel do simd collapse(2)
+    do inu = 1,nnu
+       do icol = 1,ncol
+          toa_src(icol,inu) = this%solar_source(inu)
+       end do
+    end do
+    !$acc exit data copyout(toa_src)
+    !$omp target exit data map(from:toa_src)
+
   end function gas_optics_ext
   !--------------------------------------------------------------------------------------------------------------------
   !
@@ -164,12 +223,10 @@ contains
     ! --------------
     call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
-    ! Compute layer number here
-    !   get_col_dry returns number density per cm^2
-    ! What to do if a gas the DDQ knows about isn't provided?
-    !    Use zeros? Choose a subset of the coefficients?
-
     ! Absoption optical depth
+    error_msg =  compute_tau_absorption(this,   &
+                    play, plev, tlay, gas_desc, &
+                    optical_props%tau, col_dry)
 
     ! fill in the optical properties
     call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
@@ -210,9 +267,9 @@ contains
   !
   ! Absorption optical depth
   !
-  subroutine compute_tau_absorption(this,             &
+  function compute_tau_absorption(this,             &
                           play, plev, tlay, gas_desc, &
-                          tau_abs, col_dry)
+                          tau_abs, col_dry) result(error_msg)
     class(ty_gas_optics_ddq),   intent(in ) :: this
     real(wp), dimension(:,:),   intent(in ) :: play, &   !! layer pressures [Pa, mb]; (ncol,nlay)
                                                plev, &   !! level pressures [Pa, mb]; (ncol,nlay+1)
@@ -221,6 +278,7 @@ contains
     real(wp), dimension(:,:,:), intent(out) :: tau_abs   !! Cabsorption optical depth; (ncol,nlay,nnu)
     real(wp), dimension(:,:),   intent(in   ), &
                            optional, target :: col_dry     !! Column dry amount (molecules/cm^2); dim(ncol,nlay)
+    character(len=128)                      :: error_msg
     ! -----------------------
     real(wp), dimension(size(play, 1),size(play, 2)), &
                                     target  :: dry_num_arr
@@ -232,14 +290,59 @@ contains
     integer,  dimension(size(this%mtckd_species_names)) :: mtckd_num_index
     character(len=32), &
               dimension(:), allocatable     :: temp_gas_names
-    character(len=8), &                        ! Gases provided by users; union of these with known gases
+    character(len=gas_name_len), &             ! Gases provided by users; union of these with known gases
               dimension(:), allocatable     :: provided_gases, gases_to_use
-    character(len=128)                      :: error_msg
-    integer :: ncol, nlay, ngas
+    integer :: ncol, nlay, ngas, nnu
     integer :: igas, idx_h2o
     ! -----------------------------------------------------------
     ncol = size(play, 1)
     nlay = size(play, 2)
+    nnu = this%get_ngpt()
+    ! -----------------------------------------------------------
+    ! Data validation
+    !
+    ! initialization
+    if (.not. this%is_loaded()) then
+      error_msg = 'ERROR: spectral configuration not loaded'
+      return
+    end if
+    !
+    ! Check input data sizes and values
+    !
+    !$acc        data copyin(play,plev,tlay) create(   vmr,col_gas)
+    !$omp target data map(to:play,plev,tlay) map(alloc:vmr,col_gas)
+    if(check_extents) then
+      if(.not. extents_are(play, ncol, nlay  )) &
+        error_msg = "gas_optics(): array play has wrong size"
+      if(.not. extents_are(tlay, ncol, nlay  )) &
+        error_msg = "gas_optics(): array tlay has wrong size"
+      if(.not. extents_are(plev, ncol, nlay+1)) &
+        error_msg = "gas_optics(): array plev has wrong size"
+      if(.not. extents_are(tau_abs, ncol, nlay, nnu)) &
+        error_msg = "gas_optics(): optical depth have the wrong extents"
+      if(present(col_dry)) then
+        if(.not. extents_are(col_dry, ncol, nlay)) &
+          error_msg = "gas_optics(): array col_dry has wrong size"
+      end if
+    end if
+
+    if(error_msg == '') then
+      if(check_values) then
+        if(any_vals_outside(play, this%get_press_min(),this%get_press_max())) &
+          error_msg = "gas_optics(): array play has values outside range"
+        if(any_vals_less_than(plev, 0._wp)) &
+          error_msg = "gas_optics(): array plev has values outside range"
+        if(any_vals_outside(tlay, this%get_temp_min(),  this%get_temp_max())) &
+          error_msg = "gas_optics(): array tlay has values outside range"
+        if(present(col_dry)) then
+          if(any_vals_less_than(col_dry, 0._wp)) &
+            error_msg = "gas_optics(): array col_dry has values outside range"
+        end if
+      end if
+    end if
+
+    if(error_msg /= '') return
+    ! -----------------------------------------------------------
 
     ! allocate on assignment
     temp_gas_names(:) = gas_desc%get_gas_names()
@@ -299,7 +402,7 @@ contains
                   size(mtckd_num_index), mtckd_num_index, &
                   this%mtckd_cself, this%mtckd_cfrgn, this%mtckd_n, this%mtckd_T0, this%mtckd_p0, &
                   tau_abs)
-  end subroutine compute_tau_absorption
+  end function compute_tau_absorption
   !--------------------------------------------------------------------------------------------------------------------
   !
   ! Initialiation
@@ -333,6 +436,9 @@ contains
     character(len=*), intent(in) :: mtckd_species_names(:)
     real(wp),         intent(in) :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
     real(wp),         intent(in) :: mtckd_T0, mtckd_p0
+
+    character(len=gas_name_len), dimension(:), &
+      allocatable :: all_names
     character(len = 128) :: error_msg
 
     ! -------------------------------------
@@ -349,14 +455,14 @@ contains
     mtckd_nspecies = size(mtckd_species_names)
 
     ! Check all dimensions?
-    ! Make a consolidated list of all gases?
 
-    ! Species names!
-    allocate(this%fax_a(0:fax_norder, fax_nspecies, nnu), &
+    allocate(this%fax_species_names(  fax_nspecies),      &
+             this%fax_a(0:fax_norder, fax_nspecies, nnu), &
              this%fax_b(0:fax_norder, fax_nspecies, nnu), &
              this%fax_c(0:fax_nterms, fax_nspecies, nnu), &
              this%fax_sigma0(         fax_nspecies, nnu), &
              this%fax_S (nnu))
+    this%fax_species_names = fax_species_names
     this%fax_a = fax_a
     this%fax_b = fax_b
     this%fax_c = fax_c
@@ -365,18 +471,33 @@ contains
     this%fax_T0 = fax_T0
     this%fax_p0 = fax_p0
 
-    ! Species names!
-    allocate(this%xsec_p(0:xsec_nterms, xsec_nspecies, nnu))
+    allocate(this%xsec_species_names(   xsec_nspecies),    &
+             this%xsec_p(0:xsec_nterms, xsec_nspecies, nnu))
+    this%xsec_species_names = xsec_species_names
     this%xsec_p = xsec_p
 
-    ! species names!
-    allocate(this%mtckd_cself(mtckd_nspecies, nnu), &
+    allocate(this%mtckd_species_names(mtckd_nspecies),    &
+             this%mtckd_cself(mtckd_nspecies, nnu), &
              this%mtckd_cfrgn(mtckd_nspecies, nnu), &
              this%mtckd_n    (mtckd_nspecies, nnu))
+    this%mtckd_species_names = mtckd_species_names
     this%mtckd_cself = mtckd_cself
     this%mtckd_cfrgn = mtckd_cfrgn
     this%mtckd_n     = mtckd_n
 
+    ! Make a consolidated list of all gases?
+    allocate(all_names(fax_nspecies + xsec_nspecies + mtckd_nspecies))
+    all_names(:fax_nspecies              ) = &
+      fax_species_names(:)
+    all_names(fax_nspecies+1:fax_nspecies+xsec_nspecies) = &
+      xsec_species_names(:)
+    all_names(fax_nspecies+xsec_nspecies+1:) = &
+      mtckd_species_names(:)
+    do i = 2, size(all_names)
+      if (string_in_array(all_names(i), all_names(:i-1))) all_names(i) = ""
+    end do
+
+    this%species_names(:) = pack(all_names, mask = all_names /= "")
   end function load
   !--------------------------------------------------------------------------------------------------------------------
   !
@@ -438,7 +559,7 @@ contains
     class(ty_gas_optics_ddq), intent(in) :: this
     real(wp)                             :: get_press_min !! minimum pressure for which fits are valid
 
-    get_press_min = 1._wp
+    get_press_min = 0.01_wp
   end function get_press_min
 
   !--------------------------------------------------------------------------------------------------------------------
@@ -460,7 +581,7 @@ contains
     class(ty_gas_optics_ddq), intent(in) :: this
     real(wp)                             :: get_temp_min !! minimum temperature for which fits are valid
 
-    get_temp_min = 180._wp
+    get_temp_min = 150._wp
   end function get_temp_min
 
   !--------------------------------------------------------------------------------------------------------------------
@@ -471,7 +592,7 @@ contains
     class(ty_gas_optics_ddq), intent(in) :: this
     real(wp)                             :: get_temp_max !! maximum temperature for which fits are valid
 
-    get_temp_max = 320._wp
+    get_temp_max = 350._wp
   end function get_temp_max
   !--------------------------------------------------------------------------------------------------------------------
 
