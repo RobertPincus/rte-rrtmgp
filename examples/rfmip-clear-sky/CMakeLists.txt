@@ -33,6 +33,7 @@ foreach(
     ${test_executable}
     PRIVATE rfmip_clear_utils
             rrtmgp-load-data
+            ddq-load-data
             shared-utils
             rte-rrtmgp::rte
             rte-rrtmgp::rrtmgp

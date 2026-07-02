@@ -58,6 +58,7 @@ program rrtmgp_rfmip_lw
   use mo_gas_optics,         only: ty_gas_optics
   use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
   use mo_optics_ssm,         only: ty_optics_ssm
+  use mo_gas_optics_ddq,     only: ty_gas_optics_ddq
   !
   ! modules for reading and writing files
   !
@@ -81,7 +82,7 @@ program rrtmgp_rfmip_lw
   integer            :: nargs, ncol, nlay, nbnd, nexp, nblocks, block_size, forcing_index, physics_index, n_quad_angles = 1
   integer            :: b, icol, ibnd
   character(len=4)   :: block_size_char, forcing_index_char = '1', physics_index_char = '1'
-  logical            :: do_rrtmgp, do_ssm
+  logical            :: do_rrtmgp, do_ssm, do_ddq
 
   character(len=32 ), &
             dimension(:),             allocatable :: kdist_gas_names, rfmip_gas_games
@@ -113,13 +114,15 @@ program rrtmgp_rfmip_lw
   !
   ! Determine which gas optics to use based on the name by which the program is evoked
   !   (possibly fragile)
-  ! Based on the possibilities: rrtmgp_rfmip_lw, ssm_rfmip_lw (with or without .exe on Windows)
+  ! Based on the possibilities: rrtmgp_rfmip_lw, ssm_rfmip_lw, ddq_rfmip_lw (with or without .exe on Windows)
   call get_command_argument(0, invoked_name)
   do_rrtmgp = (invoked_name(len_trim(invoked_name)-14:len_trim(invoked_name)-8 ) == "rrtmgp_" .or. &
                invoked_name(len_trim(invoked_name)-18:len_trim(invoked_name)-12) == "rrtmgp_")
   do_ssm    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ssm_"    .or. &
                invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ssm_")
-  if (.not. (do_rrtmgp .or. do_ssm)) call stop_on_err("Don't recogize which optics to use")
+  do_ssm    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ddq_"    .or. &
+               invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ddq_")
+  if (.not. (do_rrtmgp .or. do_ssm .or. do_ddq)) call stop_on_err("Don't recogize which optics to use")
 
   nargs = command_argument_count()
   if(nargs >= 2) call get_command_argument(2, rfmip_file)
@@ -164,6 +167,16 @@ program rrtmgp_rfmip_lw
     print *, "Usage: ssm_rfmip_lw [block_size] [rfmip_file]"
     flxdn_file = 'rld_ssm_rfmip-rad-irf.nc'
     flxup_file = 'rlu_ssm_rfmip-rad-irf.nc'
+    !
+    ! These variables are needed for the fragile RFMIP IO
+    !
+    kdist_gas_names = ["co2"]
+    rfmip_gas_games = ["carbon_dioxide"]
+  else if (do_ddq) then
+    allocate(ty_optics_ssm::gas_optics)
+    print *, "Usage: ddq_rfmip_lw [block_size] [rfmip_file]"
+    flxdn_file = 'rld_ddq_rfmip-rad-irf.nc'
+    flxup_file = 'rlu_ddq_rfmip-rad-irf.nc'
     !
     ! These variables are needed for the fragile RFMIP IO
     !
@@ -215,6 +228,8 @@ program rrtmgp_rfmip_lw
       end if
     type is (ty_optics_ssm)
       call stop_on_err(gas_optics%configure())
+    type is (ty_gas_optics_ddq)
+      call stop_on_err("Gotta initialize the DDQ gas optics")
   end select
   nbnd = gas_optics%get_nband()
   print *, "number of bands is", nbnd

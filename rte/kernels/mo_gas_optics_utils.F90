@@ -98,7 +98,7 @@ contains
   ! -------------------------------------------------------------------------------------------------
   function get_layer_number(ncol, nlay, vmr_h2o, plev) result(col_dry)
     !
-    !> Number density (#/cm^-2) of dry air molecules
+    !> Number density (#/m^-2) of dry air molecules
     !>    "col_dry" in RRTMGP
     ! input
     integer, intent(in)                           :: ncol, nlay
@@ -118,7 +118,7 @@ contains
         ! Get average mass of moist air per mole of moist air
         fact = 1._wp / (1.+vmr_h2o(icol,ilev))
         m_air = (m_dry + m_h2o * vmr_h2o(icol,ilev)) * fact
-        col_dry(icol,ilev) = 10._wp * delta_plev * avogad * fact/(1000._wp*m_air*100._wp*grav)
+        col_dry(icol,ilev) = delta_plev/grav * avogad * fact/m_air
       end do
     end do
   end function get_layer_number

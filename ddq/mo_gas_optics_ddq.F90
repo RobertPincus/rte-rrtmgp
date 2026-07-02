@@ -21,7 +21,7 @@ module mo_gas_optics_ddq
 ! -------------------------------------------------------------------------------------------------module gas_optics_ddq
   use mo_rte_kind,           only: wp, wl
   use mo_rte_config,         only: check_extents, check_values
-  use mo_rte_util_array,     only: zero_array
+  use mo_rte_util_array,     only : zero_array
   use mo_rte_util_array_validation, &
                              only: any_vals_less_than, any_vals_outside, extents_are
   use mo_optical_props,      only: ty_optical_props
@@ -42,15 +42,13 @@ module mo_gas_optics_ddq
   public :: ty_gas_optics_ddq
 
   integer, parameter :: gas_name_len = 8
+  integer, parameter :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
   ! -------------------------------------------------------------------------------------------------
   type, extends(ty_gas_optics), public :: ty_gas_optics_ddq
     private
     ! Spectral discretization
     ! -------------------------------------
     real(wp), allocatable :: nus(:), weights(:)  ! (nnu) Wavenumbers and weights for the DDQ scheme
-    !
-    real(wp), allocatable :: solar_source(:)     ! (nnu)
-    !
     ! -------------------------------------
     ! Functional approximations to cross-sections (fax) for line absorption
     ! -------------------------------------
@@ -80,10 +78,15 @@ module mo_gas_optics_ddq
     real(wp), allocatable :: xsec_p(:,:,:) ! (0:3, nspecies, nnu), (const, T, T^2, p scaling of cross-section)
     ! -------------------------------------
     ! MT_CKD continuum absorption (mtckd)
+    ! -------------------------------------
     character(len=gas_name_len), &
               allocatable :: mtckd_species_names(:)
     real(wp), allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
     real(wp)              :: mtckd_T0, mtckd_p0
+    ! -------------------------------------
+    ! Solar source
+    ! -------------------------------------
+    real(wp), allocatable :: solar_source(:) ! (nnu)
     ! -------------------------------------
     ! Unique list of all gases known to the class
     character(len=gas_name_len), &
@@ -133,15 +136,10 @@ contains
     integer :: icol, inu
     ! ----------------------------------------------------------
     error_msg = ""
-    !
-    ! Source function needs temperature at interfaces/levels and at layer centers
-    !   Allocate small local array for tlev unconditionally
-    !
     ncol = size(play,1)
     nlay = size(play,2)
     nnu  = this%get_ngpt()
 
-    ! --------------
     call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
     ! Absoption optical depth
@@ -208,14 +206,14 @@ contains
                                                  tlev     !! level temperatures [K]l (ncol,nlay+1)
     ! --------------
     integer :: ncol, nlay, nnu
-    real(wp), dimension(size(plev,1),size(plev,2)), target  :: tlev_arr
-    real(wp), dimension(:,:),                       pointer :: tlev_wk
-    ! ----------------------------------------------------------
-    error_msg = ""
     !
     ! Source function needs temperature at interfaces/levels and at layer centers
     !   Allocate small local array for tlev unconditionally
     !
+    real(wp), dimension(size(plev,1),size(plev,2)), target  :: tlev_arr
+    real(wp), dimension(:,:),                       pointer :: tlev_wk
+    ! ----------------------------------------------------------
+    error_msg = ""
     ncol = size(play,1)
     nlay = size(play,2)
     nnu  = this%get_ngpt()
@@ -227,9 +225,6 @@ contains
     error_msg =  compute_tau_absorption(this,   &
                     play, plev, tlay, gas_desc, &
                     optical_props%tau, col_dry)
-
-    ! fill in the optical properties
-    call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
     select type(optical_props)
       type is (ty_optical_props_2str)
@@ -355,7 +350,7 @@ contains
                                                  this%species_names),  &
                                  igas = 1, size(provided_gases))])
     ! vmr array, index 0 is the
-    allocate(vmrs( 0:size(gases_to_use), ncol, nlay))
+    allocate(vmrs(0:size(gases_to_use), ncol, nlay))
     call zero_array(ncol, nlay, vmrs(0,:,:))
     do igas = 1, ngas
       error_msg = gas_desc%get_vmr(gases_to_use(igas), vmrs(igas,:,:))
@@ -389,7 +384,8 @@ contains
       idx_h2o = string_loc_in_array("h2o", gases_to_use)
       dry_num_arr = get_layer_number(ncol, nlay,       &
                                      vmrs(idx_h2o,:,:), &
-                                     plev) ! dry air column amounts computation
+                                     plev)
+                                     ! dry air column amounts computation
     end if
 
     call tau_absorption_from_fits(ncol, nlay, this%get_ngpt(), ngas, &
@@ -408,16 +404,16 @@ contains
   ! Initialiation
   !
   function load(this,                       &
-                nus, weights, solar_source, &
+                nus, weights, &
                 fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
                 xsec_species_names, xsec_p, &
-                mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0) &
+                mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
+                solar_source) &
                 result(error_msg)
     class(ty_gas_optics_ddq), intent(inout) :: this
     ! -------------------------------------
     ! Spectral discretization
     real(wp), intent(in) :: nus(:), weights(:)  ! (nnu) Wavenumbers and weights for the DDQ scheme
-    real(wp), intent(in) :: solar_source(:)     ! (nnu)
     ! -------------------------------------
     ! Functional approximations to cross-sections (fax) for line absorption
     character(len=*), intent(in) :: fax_species_names(:)
@@ -430,20 +426,23 @@ contains
     ! -------------------------------------
     ! cross-section fits (xsec)
     character(len=*), intent(in) :: xsec_species_names(:)
-    real(wp),         intent(in) :: xsec_p ! (0:3, nspecies, nnu), (const, T, T^2, p scaling of cross-section)
+    real(wp),         intent(in) :: xsec_p(:,:,:) ! (0:3, nspecies, nnu), (const, T, T^2, p scaling of cross-section)
     ! -------------------------------------
     ! MT_CKD continuum absorption (mtckd)
     character(len=*), intent(in) :: mtckd_species_names(:)
     real(wp),         intent(in) :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
     real(wp),         intent(in) :: mtckd_T0, mtckd_p0
-
+    ! -------------------------------------
+    ! solar source
+    real(wp), optional, &
+                      intent(in) :: solar_source(:) ! (nnu)
+    ! -------------------------------------
     character(len=gas_name_len), dimension(:), &
       allocatable :: all_names
     character(len = 128) :: error_msg
 
     ! -------------------------------------
     integer :: nnu, fax_nspecies, xsec_nspecies, mtckd_nspecies, i
-    integer, parameter :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
     ! -------------------------------------
     error_msg = this%ty_optical_props%init(band_lims_wvn = &
                                              spread(nus, dim=1, ncopies=2))
@@ -454,7 +453,38 @@ contains
     xsec_nspecies  = size( xsec_species_names)
     mtckd_nspecies = size(mtckd_species_names)
 
-    ! Check all dimensions?
+    !
+    ! Check dimensions of input data
+    !
+    if (.not. extents_are(fax_a, fax_norder+1, fax_nspecies, nnu) .or. &
+        .not. extents_are(fax_b, fax_norder+1, fax_nspecies, nnu)) &
+      error_msg = "Wrong dimensions for fax_a and/or fax_b"
+    if (.not. extents_are(fax_c, fax_nterms+1, fax_nspecies, nnu)) &
+      error_msg = "Wrong dimensions for fax_c"
+    if (.not. extents_are(fax_sigma0,          fax_nspecies, nnu)) &
+      error_msg = "Wrong dimensions for fax_sigma0"
+    if (.not. extents_are(fax_T0, fax_nspecies) .or. &
+        .not. extents_are(fax_p0, fax_nspecies) .or. &
+        .not. extents_are(fax_S,  fax_nspecies)) &
+      error_msg = "fax_T0, fax_p0, fax_S depend only on species"
+
+    if(xsec_nspecies > 0) then
+      if (.not. extents_are(xsec_p, xsec_nterms, xsec_nspecies, nnu)) &
+        error_msg = "Wrong dimensions for xsec_p"
+    end if
+
+    if(mtckd_nspecies > 0) then
+      if (.not. extents_are(mtckd_cself, mtckd_nspecies, nnu) .or.  &
+          .not. extents_are(mtckd_cfrgn, mtckd_nspecies, nnu) .or. &
+          .not. extents_are(mtckd_n,     mtckd_nspecies, nnu)) &
+        error_msg = "Wrong dimensions for mtckd arrays"
+    end if
+
+    if(present(solar_source)) then
+      if (.not. extents_are(solar_source, fax_nspecies)) &
+        error_msg = "solar_source should have same extents as nus"
+    end if
+    if(error_msg /= "") return
 
     allocate(this%fax_species_names(  fax_nspecies),      &
              this%fax_a(0:fax_norder, fax_nspecies, nnu), &
@@ -485,7 +515,7 @@ contains
     this%mtckd_cfrgn = mtckd_cfrgn
     this%mtckd_n     = mtckd_n
 
-    ! Make a consolidated list of all gases?
+    ! Make a consolidated list of all gases
     allocate(all_names(fax_nspecies + xsec_nspecies + mtckd_nspecies))
     all_names(:fax_nspecies              ) = &
       fax_species_names(:)
