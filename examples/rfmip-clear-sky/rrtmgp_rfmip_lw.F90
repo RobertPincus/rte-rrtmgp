@@ -122,7 +122,7 @@ program rrtmgp_rfmip_lw
                invoked_name(len_trim(invoked_name)-18:len_trim(invoked_name)-12) == "rrtmgp_")
   do_ssm    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ssm_"    .or. &
                invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ssm_")
-  do_ssm    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ddq_"    .or. &
+  do_ddq    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ddq_"    .or. &
                invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ddq_")
   if (.not. (do_rrtmgp .or. do_ssm .or. do_ddq)) call stop_on_err("Don't recogize which optics to use")
 

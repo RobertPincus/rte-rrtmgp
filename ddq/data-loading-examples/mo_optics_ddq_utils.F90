@@ -12,13 +12,13 @@
 !    and calling gas_optics%load().
 !
 !
-module mo_optics_utils_ddq
+module mo_optics_ddq_utils
   use mo_rte_kind,           only: wp, wl
   use mo_gas_concentrations, only: ty_gas_concs
   use mo_gas_optics_ddq,     only: ty_gas_optics_ddq
   use mo_testing_utils,      only: stop_on_err
   ! --------------------------------------------------
-  use mo_simple_netcdf, only: read_field, read_char_vec, read_logical_vec, dim_exists, var_exists, get_dim_size
+  use mo_simple_netcdf, only: read_field, read_char_vec, var_exists, get_dim_size
   use netcdf
   implicit none
 
@@ -39,8 +39,8 @@ contains
     ! Functional approximations to cross-sections (fax) for line absorption
     character(len=gas_name_len), allocatable :: fax_species_names(:)
     real(wp), allocatable :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
-    real(wp), allocatable:: fax_T0(:)       ! (nspecies)
-    real(wp), allocatable:: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
+    real(wp), allocatable :: fax_T0(:)       ! (nspecies)
+    real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
     real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     real(wp), allocatable :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), allocatable :: fax_S(:)        ! (     nspecies), self-broadening coefficients
@@ -136,4 +136,4 @@ contains
     as_scalar = x(1)
   end function as_scalar
     ! --------------------------------------------------
-end module mo_optics_utils_ddq
+end module mo_optics_ddq_utils

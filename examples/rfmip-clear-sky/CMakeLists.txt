@@ -168,6 +168,7 @@ foreach(fn IN ITEMS rfmip_lw rfmip_sw)
     ssm_${fn}
     PRIVATE rfmip_clear_utils
             rrtmgp-load-data
+            ddq-load-data
             shared-utils
             rte-rrtmgp::rte
             rte-rrtmgp::rrtmgp
