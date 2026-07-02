@@ -35,7 +35,7 @@ module mo_gas_optics_ddq
   use mo_gas_optics,         only: ty_gas_optics
   use mo_gas_optics_utils,   only: compute_Planck_source, get_layer_number, interp_tlev_from_tlay
   use mo_gas_optics_ddq_kernels, &
-                             only: tau_absorption_from_fits, &
+                             only: tau_absorption_from_fits, add_tau_rayleigh, &
                                    fax_norder, fax_nterms, xsec_nterms
   implicit none
   private
@@ -82,6 +82,10 @@ module mo_gas_optics_ddq
               allocatable :: mtckd_species_names(:)
     real(wp), allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
     real(wp)              :: mtckd_T0, mtckd_p0
+    ! -------------------------------------
+    ! Rayleigh
+    ! -------------------------------------
+    real(wp), allocatable :: rayleigh_xsec(:) ! (nnu)
     ! -------------------------------------
     ! Solar source
     ! -------------------------------------
@@ -133,6 +137,7 @@ contains
     ! --------------
     integer :: ncol, nlay, nnu
     integer :: icol, inu
+    real(wp), dimension(size(play,1), size(play,2), this%get_ngpt()) :: tau_rayleigh
     ! ----------------------------------------------------------
     error_msg = ""
     ncol = size(play,1)
@@ -146,13 +151,35 @@ contains
                     play, plev, tlay, gas_desc, &
                     optical_props%tau, col_dry)
 
-    ! Revisit after Rayleigh scattering is complete
+    if (.not. allocated(this%rayleigh_xsec)) then
+      select type(optical_props)
+        type is (ty_optical_props_2str)
+          call zero_array(ncol, nlay, nnu, optical_props%ssa)
+        type is (ty_optical_props_nstr)
+          call zero_array(ncol, nlay, nnu, optical_props%ssa)
+      end select
+    else
+      !
+      ! Warning TODO: col_dry might not be defined
+      !
+      select type(optical_props)
+        type is (ty_optical_props_2str)
+          call add_tau_rayleigh(ncol, nlay, nnu,  &
+                                col_dry,          &
+                                this%rayleigh_xsec,    &
+                                optical_props%tau, optical_props%ssa)
+        type is (ty_optical_props_nstr)
+          call add_tau_rayleigh(ncol, nlay, nnu,  &
+                                col_dry,          &
+                                this%rayleigh_xsec,    &
+                                optical_props%tau, optical_props%ssa)
+      end select
+    end if
+
     select type(optical_props)
       type is (ty_optical_props_2str)
-        call zero_array(ncol, nlay, nnu, optical_props%ssa)
         call zero_array(ncol, nlay, nnu, optical_props%g)
       type is (ty_optical_props_nstr)
-        call zero_array(ncol, nlay, nnu, optical_props%ssa)
         call zero_array(optical_props%get_nmom(), &
                       ncol, nlay, nnu, optical_props%p)
     end select
@@ -407,7 +434,7 @@ contains
                 fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
                 xsec_species_names, xsec_p, &
                 mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
-                solar_source) &
+                rayleigh_xsec, solar_source) &
                 result(error_msg)
     class(ty_gas_optics_ddq), intent(inout) :: this
     ! -------------------------------------
@@ -432,6 +459,9 @@ contains
     real(wp),         intent(in) :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
     real(wp),         intent(in) :: mtckd_T0, mtckd_p0
     ! -------------------------------------
+    ! Rayleigh cross-sections
+    real(wp), optional, &
+                      intent(in) :: rayleigh_xsec(:) ! (nnu)
     ! solar source
     real(wp), optional, &
                       intent(in) :: solar_source(:) ! (nnu)
@@ -468,7 +498,7 @@ contains
       error_msg = "fax_T0, fax_p0, fax_S depend only on species"
 
     if(xsec_nspecies > 0) then
-      if (.not. extents_are(xsec_p, xsec_nterms, xsec_nspecies, nnu)) &
+      if (.not. extents_are(xsec_p, xsec_nterms+1, xsec_nspecies, nnu)) &
         error_msg = "Wrong dimensions for xsec_p"
     end if
 
@@ -479,6 +509,10 @@ contains
         error_msg = "Wrong dimensions for mtckd arrays"
     end if
 
+    if(present(rayleigh_xsec)) then
+      if (.not. extents_are(rayleigh_xsec, fax_nspecies)) &
+        error_msg = "rayleigh_xsec should have same extents as nus"
+    end if
     if(present(solar_source)) then
       if (.not. extents_are(solar_source, fax_nspecies)) &
         error_msg = "solar_source should have same extents as nus"
@@ -513,6 +547,15 @@ contains
     this%mtckd_cself = mtckd_cself
     this%mtckd_cfrgn = mtckd_cfrgn
     this%mtckd_n     = mtckd_n
+
+    if (present(rayleigh_xsec)) then
+      allocate(this%rayleigh_xsec(nnu))
+      this%rayleigh_xsec = rayleigh_xsec
+    end if
+    if (present(solar_source)) then
+      allocate(this%solar_source(nnu))
+      this%solar_source = solar_source
+    end if
 
     ! Make a consolidated list of all gases
     allocate(all_names(fax_nspecies + xsec_nspecies + mtckd_nspecies))

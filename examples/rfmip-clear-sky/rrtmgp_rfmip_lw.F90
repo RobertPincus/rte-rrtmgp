@@ -79,7 +79,7 @@ program rrtmgp_rfmip_lw
   character(len=512) :: invoked_name
   character(len=512) :: rfmip_file = 'multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc'
   character(len=512) :: kdist_file = 'coefficients_lw.nc'
-  character(len=512) :: ddq_file   = 'ddq_coefficients_lw.nc'
+  character(len=512) :: ddq_file   = 'gas_optics_lw.nc'
   character(len=132) :: flxdn_file, flxup_file
   integer            :: nargs, ncol, nlay, nbnd, nexp, nblocks, block_size, forcing_index, physics_index, n_quad_angles = 1
   integer            :: b, icol, ibnd
@@ -176,7 +176,8 @@ program rrtmgp_rfmip_lw
     rfmip_gas_games = ["carbon_dioxide"]
   else if (do_ddq) then
     allocate(ty_gas_optics_ddq::gas_optics)
-    print *, "Usage: ddq_rfmip_lw [block_size] [rfmip_file]"
+    print *, "Usage: ddq_rfmip_lw [block_size] [rfmip_file] [ddq_file]"
+    if(nargs >= 3) call get_command_argument(3, ddq_file)
     flxdn_file = 'rld_ddq_rfmip-rad-irf.nc'
     flxup_file = 'rlu_ddq_rfmip-rad-irf.nc'
     !
@@ -232,7 +233,6 @@ program rrtmgp_rfmip_lw
       call stop_on_err(gas_optics%configure())
     type is (ty_gas_optics_ddq)
       call load_gas_optics_ddq(gas_optics, trim(ddq_file))
-      call stop_on_err("Gotta initialize the DDQ gas optics")
   end select
   nbnd = gas_optics%get_nband()
   print *, "number of bands is", nbnd

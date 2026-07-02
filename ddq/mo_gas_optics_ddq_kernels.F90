@@ -4,7 +4,7 @@ module mo_gas_optics_ddq_kernels
 
   implicit none
   private
-  public :: tau_absorption_from_fits
+  public :: tau_absorption_from_fits, add_tau_rayleigh
   integer, parameter, public :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
 
 contains
@@ -120,4 +120,33 @@ contains
       end do
     end do
   end subroutine tau_absorption_from_fits
+  !--------------------------------------------------------------------------------------------------------------------
+  !
+  ! Compute absorption optical depth from second-order polynomial approximations
+  !    for absorption cross-section
+  !
+  subroutine add_tau_rayleigh(ncol, nlay, nnu,  &
+                              dry_num,          &
+                              rayleigh_xsec,    &
+                              tau, ssa) bind(C, name="ddq_add_tau_rayleigh")
+    integer,  intent(in)    :: ncol, nlay, nnu
+    real(wp), intent(in)    :: dry_num(ncol, nlay)
+    real(wp), intent(in)    :: rayleigh_xsec(nnu)
+    real(wp), intent(inout) :: tau(ncol, nlay, nnu), ssa(ncol, nlay, nnu)
+    ! -----------------
+    integer  :: icol, ilay, inu
+    real(wp) :: t, t_r
+
+    do inu = 1, nnu
+      do ilay = 1, nlay
+        do icol = 1, ncol
+          t_r = dry_num(ncol, nlay) * rayleigh_xsec(inu)
+          t = tau(icol, ilay, inu)
+          tau(icol, ilay, inu) = t + t_r
+          ssa(icol, ilay, inu) = t_r/(t + t_r)
+        end do
+      end do
+    end do
+  end subroutine add_tau_rayleigh
+  !--------------------------------------------------------------------------------------------------------------------
 end module mo_gas_optics_ddq_kernels

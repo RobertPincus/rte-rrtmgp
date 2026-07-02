@@ -185,3 +185,71 @@ foreach(fn IN ITEMS rfmip_lw rfmip_sw)
     run_ssm_${fn} PROPERTIES FIXTURES_REQUIRED "copy_rename_ssm_rfmip_inputs"
   )
 endforeach()
+
+# ##############################################################################
+#
+# Data driven quadrature tests
+#
+# Copy and rename inputs
+#
+foreach(fn IN LISTS inoutputs)
+  # Rename rule: from RFMIP-compatible to simpler name
+  string(
+    REGEX
+    REPLACE "Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn"
+            "ddq_rfmip-rad-irf"
+            new_name
+            "${fn}"
+  )
+
+  set(src "${RRTMGP_DATA}/examples/rfmip-clear-sky/inputs/${fn}")
+  set(dst "${CMAKE_CURRENT_BINARY_DIR}/${new_name}")
+
+  add_test(
+    NAME copy_ddq_rfmip_inputs_${fn}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${src}" "${dst}"
+  )
+  set_tests_properties(
+    copy_ddq_rfmip_inputs_${fn}
+    PROPERTIES FIXTURES_REQUIRED
+               fetch_rrtmgp_data
+               FIXTURES_SETUP
+               copy_rename_ddq_rfmip_inputs
+  )
+
+  list(APPEND RENAMED_OUTPUTS "${dst}")
+endforeach()
+
+#
+# Link/rename and run executables
+#
+
+foreach(fn IN ITEMS rfmip_lw)
+  add_executable(ddq_${fn} rrtmgp_${fn}.F90)
+  target_include_directories(
+    ddq_${fn}
+    PUBLIC
+      $<BUILD_INTERFACE:$<$<COMPILE_LANGUAGE:Fortran>:${CMAKE_Fortran_MODULE_DIRECTORY}>>
+  )
+  target_link_libraries(
+    ddq_${fn}
+    PRIVATE rfmip_clear_utils
+            rrtmgp-load-data
+            ddq-load-data
+            shared-utils
+            rte-rrtmgp::rte
+            rte-rrtmgp::rrtmgp
+            rte-rrtmgp::ssm
+            rte-rrtmgp::ddq
+  )
+  add_test(
+    NAME run_ddq_${fn}
+    COMMAND
+      ddq_${fn} 8
+      ${RRTMGP_DATA}/examples/rfmip-clear-sky/inputs/multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc
+      ${DDQ_DATA}/gas_optics_lw.nc
+  )
+  set_tests_properties(
+    run_ddq_${fn} PROPERTIES FIXTURES_REQUIRED "copy_rename_ddq_rfmip_inputs"
+  )
+endforeach()

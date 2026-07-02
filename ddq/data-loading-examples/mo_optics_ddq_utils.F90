@@ -17,6 +17,8 @@ module mo_optics_ddq_utils
   use mo_gas_concentrations, only: ty_gas_concs
   use mo_gas_optics_ddq,     only: ty_gas_optics_ddq
   use mo_testing_utils,      only: stop_on_err
+  use mo_gas_optics_ddq_kernels, &
+                             only: fax_norder, fax_nterms, xsec_nterms
   ! --------------------------------------------------
   use mo_simple_netcdf, only: read_field, read_char_vec, var_exists, get_dim_size
   use netcdf
@@ -55,6 +57,8 @@ contains
     real(wp),         allocatable :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Splar source function
+    real(wp), allocatable :: rayleigh_xsec(:) ! (nnu)
+    ! Splar source function
     real(wp), allocatable :: solar_source(:) ! (nnu)
 
     ! -----------------
@@ -63,8 +67,8 @@ contains
     !
     integer :: ncid
     integer :: nnu, &
-               fax_nspecies, fax_norder, fax_nterms, &
-               xsec_nspecies, xsec_nterms, &
+               fax_nspecies,  &
+               xsec_nspecies, &
                mtckd_nspecies
     ! --------------------------------------------------
     !
@@ -74,10 +78,7 @@ contains
       call stop_on_err("load_gas_optics(): can't open file " // trim(fileName))
     nnu            = get_dim_size(ncid,'nu')
     fax_nspecies   = get_dim_size(ncid,'fax_nspecies')
-    fax_norder     = get_dim_size(ncid,'fax_t_order')
-    fax_nterms     = get_dim_size(ncid,'fax_p_nterms')
     xsec_nspecies  = get_dim_size(ncid,'xsec_nspecies')
-    xsec_nterms    = get_dim_size(ncid,'xsec_nterms')
     mtckd_nspecies = get_dim_size(ncid,'mtckd_nspecies')
 
     ! -----------------
@@ -86,17 +87,17 @@ contains
     !
     nus     = read_field(ncid, 'nu',      nnu)
     weights = read_field(ncid, 'weights', nnu)
-    fax_species_names  = read_char_vec(ncid, 'fax_species_names',   fax_nspecies)
-    fax_a  = read_field(ncid, 'fax_a', fax_norder, fax_nspecies, nnu)
-    fax_b  = read_field(ncid, 'fax_b', fax_norder, fax_nspecies, nnu)
-    fax_c  = read_field(ncid, 'fax_c', fax_nterms, fax_nspecies, nnu)
+    fax_species_names  = read_char_vec(ncid, 'fax_species_names', fax_nspecies)
+    fax_a  = read_field(ncid, 'fax_a', fax_norder+1, fax_nspecies, nnu)
+    fax_b  = read_field(ncid, 'fax_b', fax_norder+1, fax_nspecies, nnu)
+    fax_c  = read_field(ncid, 'fax_c', fax_nterms+1, fax_nspecies, nnu)
     fax_T0 = read_field(ncid, 'fax_T0', fax_nspecies)
     fax_p0 = read_field(ncid, 'fax_p0', fax_nspecies)
-    fax_S  = read_field(ncid, 'faxS',   fax_nspecies)
+    fax_S  = read_field(ncid, 'fax_S',  fax_nspecies)
     fax_sigma0 = read_field(ncid, 'fax_sigma0', fax_nspecies, nnu)
 
     xsec_species_names  = read_char_vec(ncid, 'xsec_species_names',  xsec_nspecies)
-    xsec_p = read_field(ncid, 'xsec_p', xsec_nterms, xsec_nspecies, nnu)
+    xsec_p = read_field(ncid, 'xsec_p', xsec_nterms+1, xsec_nspecies, nnu)
 
     mtckd_species_names = read_char_vec(ncid, 'mtckd_species_names', mtckd_nspecies)
     mtckd_cself = read_field(ncid, 'mtckd_cself', mtckd_nspecies, nnu)
@@ -111,13 +112,17 @@ contains
     ! gas_optics%load() returns a string; a non-empty string indicates an error.
     !
     if(var_exists(ncid, 'solar_spectral_radiance')) then
+      !
+      ! Cheating a bit, expecting rayleigh_xsec and solar_spectral_radiance to be present together
+      !
+      rayleigh_xsec = read_field(ncid, 'rayleigh_xsec', nnu)
       solar_source = read_field(ncid, 'solar_source', nnu)
       call stop_on_err(gas_optics%load( &
                       nus, weights,     &
                       fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
-                      solar_source))
+                      rayleigh_xsec, solar_source))
     else
       call stop_on_err(gas_optics%load( &
                       nus, weights,     &
