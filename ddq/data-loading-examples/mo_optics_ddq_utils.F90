@@ -15,9 +15,7 @@
 module mo_optics_utils_ddq
   use mo_rte_kind,           only: wp, wl
   use mo_gas_concentrations, only: ty_gas_concs
-  use mo_gas_optics_ddq,  only: ty_gas_optics_rrtmgp
-  use mo_cloud_optics_rrtmgp, &
-                             only: ty_cloud_optics_rrtmgp
+  use mo_gas_optics_ddq,     only: ty_gas_optics_ddq
   use mo_testing_utils,      only: stop_on_err
   ! --------------------------------------------------
   use mo_simple_netcdf, only: read_field, read_char_vec, read_logical_vec, dim_exists, var_exists, get_dim_size
@@ -37,7 +35,6 @@ contains
     ! -------------------------------------
     ! Spectral discretization
     real(wp), allocatable :: nus(:), weights(:)  ! (nnu) Wavenumbers and weights for the DDQ scheme
-    real(wp), allocatable :: solar_source(:)     ! (nnu)
     ! -------------------------------------
     ! Functional approximations to cross-sections (fax) for line absorption
     character(len=gas_name_len), allocatable :: fax_species_names(:)
@@ -90,23 +87,23 @@ contains
     nus     = read_field(ncid, 'nu',      nnu)
     weights = read_field(ncid, 'weights', nnu)
     fax_species_names  = read_char_vec(ncid, 'fax_species_names',   fax_nspecies)
-    fax_a  = read_field(ncid, 'fax_a', fax_norder, fax_species, nnu)
-    fax_b  = read_field(ncid, 'fax_b', fax_norder, fax_species, nnu)
-    fax_c  = read_field(ncid, 'fax_c', fax_nterms, fax_species, nnu)
-    fax_T0 = read_field(ncid, 'fax_T0', fax_species)
-    fax_p0 = read_field(ncid, 'fax_p0', fax_species)
+    fax_a  = read_field(ncid, 'fax_a', fax_norder, fax_nspecies, nnu)
+    fax_b  = read_field(ncid, 'fax_b', fax_norder, fax_nspecies, nnu)
+    fax_c  = read_field(ncid, 'fax_c', fax_nterms, fax_nspecies, nnu)
+    fax_T0 = read_field(ncid, 'fax_T0', fax_nspecies)
+    fax_p0 = read_field(ncid, 'fax_p0', fax_nspecies)
     fax_S  = read_field(ncid, 'faxS',   fax_nspecies)
     fax_sigma0 = read_field(ncid, 'fax_sigma0', fax_nspecies, nnu)
 
     xsec_species_names  = read_char_vec(ncid, 'xsec_species_names',  xsec_nspecies)
-    xsec_p = read_field(ncid, 'xsec_p', xsec_nterms, xsec_nspecies, nu)
+    xsec_p = read_field(ncid, 'xsec_p', xsec_nterms, xsec_nspecies, nnu)
 
     mtckd_species_names = read_char_vec(ncid, 'mtckd_species_names', mtckd_nspecies)
-    mtckd_cself = read_field(ncid, 'mtckd_cself', mtckd_nspecies, nu)
-    mtckd_cfrgn = read_field(ncid, 'mtckd_cfrgn', mtckd_nspecies, nu)
-    mtckd_n     = read_field(ncid, 'mtckd_n',     mtckd_nspecies, nu)
-    mtckd_T0    = read_field(ncid, 'mtckd_T0',    mtckd_nspecies)
-    mtckd_p0    = read_field(ncid, 'mtckd_p0',    mtckd_nspecies)
+    mtckd_cself = read_field(ncid, 'mtckd_cself', mtckd_nspecies, nnu)
+    mtckd_cfrgn = read_field(ncid, 'mtckd_cfrgn', mtckd_nspecies, nnu)
+    mtckd_n     = read_field(ncid, 'mtckd_n',     mtckd_nspecies, nnu)
+    mtckd_T0    = as_scalar(read_field(ncid, 'mtckd_T0', 1))
+    mtckd_p0    = as_scalar(read_field(ncid, 'mtckd_p0', 1))
     ! --------------------------------------------------
     !
     ! Initialize the gas optics class with data. The calls look slightly different depending
@@ -115,15 +112,15 @@ contains
     !
     if(var_exists(ncid, 'solar_spectral_radiance')) then
       solar_source = read_field(ncid, 'solar_source', nnu)
-      call stop_on_err(gas_optics%load(
-                      nus, weights, solar_source, &
+      call stop_on_err(gas_optics%load( &
+                      nus, weights,     &
                       fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
                       solar_source))
     else
-      call stop_on_err(gas_optics%load(
-                      nus, weights, solar_source, &
+      call stop_on_err(gas_optics%load( &
+                      nus, weights,     &
                       fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0))
@@ -131,5 +128,12 @@ contains
     ! --------------------------------------------------
     ncid = nf90_close(ncid)
   end subroutine load_gas_optics
+    ! --------------------------------------------------
+  function as_scalar(x)
+    real(wp), dimension(1), intent(in):: x
+    real(wp) :: as_scalar
 
+    as_scalar = x(1)
+  end function as_scalar
+    ! --------------------------------------------------
 end module mo_optics_utils_ddq

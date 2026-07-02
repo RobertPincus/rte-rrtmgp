@@ -38,6 +38,7 @@ foreach(
             rte-rrtmgp::rte
             rte-rrtmgp::rrtmgp
             rte-rrtmgp::ssm
+            rte-rrtmgp::ddq
   )
 endforeach()
 
@@ -171,6 +172,7 @@ foreach(fn IN ITEMS rfmip_lw rfmip_sw)
             rte-rrtmgp::rte
             rte-rrtmgp::rrtmgp
             rte-rrtmgp::ssm
+            rte-rrtmgp::ddq
   )
   add_test(
     NAME run_ssm_${fn}

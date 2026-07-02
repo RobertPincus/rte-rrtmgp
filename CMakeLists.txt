@@ -139,6 +139,7 @@ exit(tuple(map(int, xarray.__version__.split('.'))) < (0, 12, 2))"
     fetch_rrtmgp_data PROPERTIES FIXTURES_SETUP fetch_rrtmgp_data
   )
   add_subdirectory(rrtmgp/data-loading-examples)
+  add_subdirectory(ddq/data-loading-examples)
   add_subdirectory(examples)
   add_subdirectory(tests)
 else()

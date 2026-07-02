@@ -66,9 +66,10 @@ program rrtmgp_rfmip_lw
                                    read_and_block_lw_bc, determine_gas_names
   use mo_testing_utils,      only: stop_on_err
   !
-  ! RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
+  ! Some gas optics class needs to be initialized with data read from a netCDF files
   !
-  use mo_optics_utils_rrtmgp,only: load_gas_optics
+  use mo_optics_utils_rrtmgp,only: load_gas_optics_rrtmgp => load_gas_optics
+  use mo_optics_ddq_utils,   only: load_gas_optics_ddq    => load_gas_optics
 
   implicit none
   ! --------------------------------------------------
@@ -78,6 +79,7 @@ program rrtmgp_rfmip_lw
   character(len=512) :: invoked_name
   character(len=512) :: rfmip_file = 'multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc'
   character(len=512) :: kdist_file = 'coefficients_lw.nc'
+  character(len=512) :: ddq_file   = 'ddq_coefficients_lw.nc'
   character(len=132) :: flxdn_file, flxup_file
   integer            :: nargs, ncol, nlay, nbnd, nexp, nblocks, block_size, forcing_index, physics_index, n_quad_angles = 1
   integer            :: b, icol, ibnd
@@ -173,7 +175,7 @@ program rrtmgp_rfmip_lw
     kdist_gas_names = ["co2"]
     rfmip_gas_games = ["carbon_dioxide"]
   else if (do_ddq) then
-    allocate(ty_optics_ssm::gas_optics)
+    allocate(ty_gas_optics_ddq::gas_optics)
     print *, "Usage: ddq_rfmip_lw [block_size] [rfmip_file]"
     flxdn_file = 'rld_ddq_rfmip-rad-irf.nc'
     flxup_file = 'rlu_ddq_rfmip-rad-irf.nc'
@@ -211,7 +213,7 @@ program rrtmgp_rfmip_lw
       ! Read k-distribution information. load_gas_optics() reads data from netCDF and calls
       !   gas_optics%init(); users might want to use their own reading methods
       !
-      call load_gas_optics(gas_optics, trim(kdist_file), gas_conc_array(1))
+      call load_gas_optics_rrtmgp(gas_optics, trim(kdist_file), gas_conc_array(1))
       if(.not. gas_optics%source_is_internal()) &
         stop "rrtmgp_rfmip_lw: k-distribution file isn't LW"
       !
@@ -229,6 +231,7 @@ program rrtmgp_rfmip_lw
     type is (ty_optics_ssm)
       call stop_on_err(gas_optics%configure())
     type is (ty_gas_optics_ddq)
+      call load_gas_optics_ddq(gas_optics, trim(ddq_file))
       call stop_on_err("Gotta initialize the DDQ gas optics")
   end select
   nbnd = gas_optics%get_nband()

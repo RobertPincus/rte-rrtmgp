@@ -5,6 +5,7 @@ module mo_gas_optics_ddq_kernels
   implicit none
   private
   public :: tau_absorption_from_fits
+  integer, parameter, public :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
 
 contains
   !--------------------------------------------------------------------------------------------------------------------

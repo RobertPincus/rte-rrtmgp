@@ -15,8 +15,7 @@ module mo_gas_optics_ddq
 !>
 !> Two variants apply to internal Planck sources (longwave radiation in the Earth's atmosphere) and to
 !>   external stellar radiation (shortwave radiation in the Earth's atmosphere).
-!>   The variant is chosen based on what information is supplied during initialization.
-!   (It might make more sense to define two sub-classes)
+!>   The variant is chosen based on whether a solar_source is supplied during initialization.
 !
 ! -------------------------------------------------------------------------------------------------module gas_optics_ddq
   use mo_rte_kind,           only: wp, wl
@@ -36,13 +35,13 @@ module mo_gas_optics_ddq
   use mo_gas_optics,         only: ty_gas_optics
   use mo_gas_optics_utils,   only: compute_Planck_source, get_layer_number, interp_tlev_from_tlay
   use mo_gas_optics_ddq_kernels, &
-                             only: tau_absorption_from_fits
+                             only: tau_absorption_from_fits, &
+                                   fax_norder, fax_nterms, xsec_nterms
   implicit none
   private
   public :: ty_gas_optics_ddq
 
   integer, parameter :: gas_name_len = 8
-  integer, parameter :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
   ! -------------------------------------------------------------------------------------------------
   type, extends(ty_gas_optics), public :: ty_gas_optics_ddq
     private
