@@ -176,7 +176,7 @@ contains
     !$omp target teams distribute parallel do simd collapse(2)
     do inu = 1,nnu
        do icol = 1,ncol
-          toa_src(icol,inu) = this%solar_source(inu)
+          toa_src(icol,inu) = this%solar_source(inu) * this%weights(inu)
        end do
     end do
     !$acc exit data copyout(toa_src)
