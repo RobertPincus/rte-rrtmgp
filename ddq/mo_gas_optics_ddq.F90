@@ -560,6 +560,8 @@ contains
     this%mtckd_cself = mtckd_cself
     this%mtckd_cfrgn = mtckd_cfrgn
     this%mtckd_n     = mtckd_n
+    this%mtckd_T0    = mtckd_T0
+    this%mtckd_p0    = mtckd_p0
 
     if (present(rayleigh_xsec)) then
       allocate(this%rayleigh_xsec(nnu))

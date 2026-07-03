@@ -20,7 +20,7 @@ module mo_optics_ddq_utils
   use mo_gas_optics_ddq_kernels, &
                              only: fax_norder, fax_nterms, xsec_nterms
   ! --------------------------------------------------
-  use mo_simple_netcdf, only: read_field, read_char_vec, var_exists, get_dim_size
+  use mo_simple_netcdf, only: read_field, read_scalar, read_char_vec, var_exists, get_dim_size
   use netcdf
   implicit none
 
@@ -54,7 +54,7 @@ contains
     ! MT_CKD continuum absorption (mtckd)
     character(len=gas_name_len), allocatable :: mtckd_species_names(:)
     real(wp),         allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
-    real(wp),         allocatable :: mtckd_T0, mtckd_p0
+    real(wp)                      :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Splar source function
     real(wp), allocatable :: rayleigh_xsec(:) ! (nnu)
@@ -103,8 +103,8 @@ contains
     mtckd_cself = read_field(ncid, 'mtckd_cself', mtckd_nspecies, nnu)
     mtckd_cfrgn = read_field(ncid, 'mtckd_cfrgn', mtckd_nspecies, nnu)
     mtckd_n     = read_field(ncid, 'mtckd_n',     mtckd_nspecies, nnu)
-    mtckd_T0    = as_scalar(read_field(ncid, 'mtckd_T0', 1))
-    mtckd_p0    = as_scalar(read_field(ncid, 'mtckd_p0', 1))
+    mtckd_T0    = read_scalar(ncid, 'mtckd_T0')
+    mtckd_p0    = read_scalar(ncid, 'mtckd_p0')
 
     ! --------------------------------------------------
     !
@@ -131,15 +131,8 @@ contains
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0))
     end if
-    ! --------------------------------------------------
+
     ncid = nf90_close(ncid)
   end subroutine load_gas_optics
-    ! --------------------------------------------------
-  function as_scalar(x)
-    real(wp), dimension(1), intent(in):: x
-    real(wp) :: as_scalar
-
-    as_scalar = x(1)
-  end function as_scalar
-    ! --------------------------------------------------
+  ! --------------------------------------------------
 end module mo_optics_ddq_utils

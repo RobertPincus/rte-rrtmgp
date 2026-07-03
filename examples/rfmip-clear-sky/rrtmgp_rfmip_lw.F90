@@ -209,7 +209,6 @@ program rrtmgp_rfmip_lw
   !
   call read_and_block_gases_ty(rfmip_file, block_size, kdist_gas_names, rfmip_gas_games, gas_conc_array)
   call read_and_block_lw_bc(rfmip_file, block_size, sfc_emis, sfc_t)
-  print *, "gases after RFMIP reading: ", gas_conc_array(1)%get_gas_names()
 
   select type (gas_optics)
     type is (ty_gas_optics_rrtmgp)
@@ -307,6 +306,9 @@ program rrtmgp_rfmip_lw
   !$omp target exit data map(release:source%lay_source, source%lev_source, source%sfc_source)
   !$acc exit data delete(source)
   ! --------------------------------------------------m
+    print *, "Full range of broadband fluxes: ", &
+      minval(flux_up), maxval(flux_up), &
+      minval(flux_dn), maxval(flux_dn)
   call unblock_and_write(trim(flxup_file), 'rlu', flux_up)
   call unblock_and_write(trim(flxdn_file), 'rld', flux_dn)
 end program rrtmgp_rfmip_lw

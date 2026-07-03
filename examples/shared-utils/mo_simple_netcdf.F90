@@ -15,7 +15,7 @@ module mo_simple_netcdf
 
   public :: dim_exists, get_dim_size, create_dim, &
             var_exists, get_var_size, create_var, &
-            read_field, read_string, read_char_vec, read_logical_vec, write_field
+            read_field, read_scalar, read_string, read_char_vec, read_logical_vec, write_field
 contains
   !--------------------------------------------------------------------------------------------------------------------
   function read_scalar(ncid, varName)
