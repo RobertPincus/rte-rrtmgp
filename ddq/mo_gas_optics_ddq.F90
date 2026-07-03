@@ -102,12 +102,11 @@ module mo_gas_optics_ddq
     procedure, public :: get_press_max
     procedure, public :: get_temp_min
     procedure, public :: get_temp_max
-    ! procedure, public :: finalize
-
     procedure, public :: get_ngas
     procedure, public :: get_gases
 
     procedure, public :: load
+    procedure, public :: set_tsi
 
     procedure, public  :: gas_optics_int
     procedure, public  :: gas_optics_ext
@@ -587,6 +586,47 @@ contains
     allocate(this%species_names(count(all_names /= "")))
     this%species_names(:) = pack(all_names, mask = all_names /= "")
   end function load
+  !------------------------------------------------------------------------------------------
+  ! Total solar irradiance
+  !------------------------------------------------------------------------------------------
+  function set_tsi(this, tsi) result(error_msg)
+    !
+    !> Scale the solar source function without changing the spectral distribution
+    !
+    class(ty_gas_optics_ddq), intent(inout) :: this
+    real(wp),                 intent(in   ) :: tsi !! user-specified total solar irradiance;
+    character(len=128)                      :: error_msg !! Empty if successful
+
+    real(wp) :: norm
+    integer  :: igpt, length
+    ! ----------------------------------------------------------
+    error_msg = ""
+    if(tsi < 0._wp) then
+      error_msg = 'tsi out of range'
+    else if(.not. allocated(this%solar_source)) then
+      error_msg = 'no solar source to rescale with TSI'
+    else
+      !
+      ! Scale the solar source function to the input tsi
+      !
+      norm = 0._wp
+      length = size(this%solar_source)
+      !$acc parallel loop gang vector reduction(+:norm)
+      !$omp target teams distribute parallel do simd reduction(+:norm)
+      do igpt = 1, length
+         norm = norm + this%solar_source(igpt)
+      end do
+
+      norm = 1._wp/norm
+
+      !$acc parallel loop gang vector
+      !$omp target teams distribute parallel do simd
+      do igpt = 1, length
+         this%solar_source(igpt) = this%solar_source(igpt) * tsi * norm
+      end do
+    end if
+
+  end function set_tsi
   !--------------------------------------------------------------------------------------------------------------------
   !
   ! Inquiry functions
