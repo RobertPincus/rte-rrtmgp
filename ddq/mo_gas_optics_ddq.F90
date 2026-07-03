@@ -243,14 +243,14 @@ contains
     ncol = size(play,1)
     nlay = size(play,2)
     nnu  = this%get_ngpt()
-
     ! --------------
     call optical_props%set_top_at_1(play(1,1) < play(1, nlay))
 
     ! Absoption optical depth
-    error_msg =  compute_tau_absorption(this,   &
+    error_msg = compute_tau_absorption(this,   &
                     play, plev, tlay, gas_desc, &
                     optical_props%tau, col_dry)
+    if(error_msg /= "") return
 
     select type(optical_props)
       type is (ty_optical_props_2str)
@@ -316,6 +316,7 @@ contains
     integer :: ncol, nlay, ngas, nnu
     integer :: igas, idx_h2o
     ! -----------------------------------------------------------
+    error_msg = ""
     ncol = size(play, 1)
     nlay = size(play, 2)
     nnu = this%get_ngpt()
@@ -324,7 +325,7 @@ contains
     !
     ! initialization
     if (.not. this%is_loaded()) then
-      error_msg = 'ERROR: spectral configuration not loaded'
+      error_msg = 'Spectral configuration not loaded'
       return
     end if
     !
@@ -365,20 +366,27 @@ contains
     if(error_msg /= '') return
     ! -----------------------------------------------------------
 
-    ! allocate on assignment
+    allocate(temp_gas_names(gas_desc%get_num_gases()), &
+             provided_gases(gas_desc%get_num_gases()))
+    ! temp_gas_names is of uniform string length
     temp_gas_names(:) = gas_desc%get_gas_names()
     ! Which gases does the user provide?
     provided_gases(:) = [(trim(temp_gas_names(igas)), &
                           igas = 1, size(temp_gas_names))]
+
     ! Which gases does the user provide that the scheme knows about?
+    allocate(gases_to_use(count([(string_in_array(provided_gases(igas), &
+                                                 this%species_names),  &
+                                 igas = 1, size(provided_gases))])))
     gases_to_use = pack(provided_gases, &
                         mask = [(string_in_array(provided_gases(igas), &
                                                  this%species_names),  &
                                  igas = 1, size(provided_gases))])
+
     ! vmr array, index 0 is the
     allocate(vmrs(0:size(gases_to_use), ncol, nlay))
     call zero_array(ncol, nlay, vmrs(0,:,:))
-    do igas = 1, ngas
+    do igas = 1, size(gases_to_use)
       error_msg = gas_desc%get_vmr(gases_to_use(igas), vmrs(igas,:,:))
       if (error_msg /= "") return
     end do
@@ -413,8 +421,7 @@ contains
                                      plev)
                                      ! dry air column amounts computation
     end if
-
-    call tau_absorption_from_fits(ncol, nlay, this%get_ngpt(), ngas, &
+    call tau_absorption_from_fits(ncol, nlay, this%get_ngpt(), size(gases_to_use), &
                   this%nus, &
                   play, tlay, dry_num, vmrs, &
                   size(fax_num_index), fax_num_index,   &
@@ -485,6 +492,8 @@ contains
     !
     ! Check dimensions of input data
     !
+    if (.not. extents_are(weights, nnu)) &
+      error_msg = "Need the same number of weights, nus"
     if (.not. extents_are(fax_a, fax_norder+1, fax_nspecies, nnu) .or. &
         .not. extents_are(fax_b, fax_norder+1, fax_nspecies, nnu)) &
       error_msg = "Wrong dimensions for fax_a and/or fax_b"
@@ -518,6 +527,10 @@ contains
         error_msg = "solar_source should have same extents as nus"
     end if
     if(error_msg /= "") return
+    ! ----------------------------------------------------------
+    allocate(this%nus(nnu), this%weights(nnu))
+    this%nus = nus
+    this%weights = weights
 
     allocate(this%fax_species_names(  fax_nspecies),      &
              this%fax_a(0:fax_norder, fax_nspecies, nnu), &
@@ -569,6 +582,7 @@ contains
       if (string_in_array(all_names(i), all_names(:i-1))) all_names(i) = ""
     end do
 
+    allocate(this%species_names(count(all_names /= "")))
     this%species_names(:) = pack(all_names, mask = all_names /= "")
   end function load
   !--------------------------------------------------------------------------------------------------------------------

@@ -212,7 +212,7 @@ foreach(fn IN LISTS inoutputs)
   set_tests_properties(
     copy_ddq_rfmip_inputs_${fn}
     PROPERTIES FIXTURES_REQUIRED
-               fetch_rrtmgp_data
+               "fetch_rrtmgp_data;fetch_ddq_data"
                FIXTURES_SETUP
                copy_rename_ddq_rfmip_inputs
   )

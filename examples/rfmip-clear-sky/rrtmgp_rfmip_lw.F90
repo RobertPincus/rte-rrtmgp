@@ -186,7 +186,6 @@ program rrtmgp_rfmip_lw
     kdist_gas_names = ["co2"]
     rfmip_gas_games = ["carbon_dioxide"]
   end if
-
   !
   ! How big is the problem? Does it fit into blocks of the size we've specified?
   !
@@ -207,6 +206,7 @@ program rrtmgp_rfmip_lw
   !
   call read_and_block_gases_ty(rfmip_file, block_size, kdist_gas_names, rfmip_gas_games, gas_conc_array)
   call read_and_block_lw_bc(rfmip_file, block_size, sfc_emis, sfc_t)
+  print *, "gases after RFMIP reading: ", gas_conc_array(1)%get_gas_names()
 
   select type (gas_optics)
     type is (ty_gas_optics_rrtmgp)
@@ -236,7 +236,6 @@ program rrtmgp_rfmip_lw
   end select
   nbnd = gas_optics%get_nband()
   print *, "number of bands is", nbnd
-
   !
   ! Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
   !   gas optical properties, and source functions. The %alloc() routines carry along

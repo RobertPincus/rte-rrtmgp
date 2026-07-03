@@ -56,9 +56,9 @@ contains
      ! Local variables
     integer :: icol, ilay, inu
 
-   !$acc                         parallel loop    collapse(3) copyin(nus,dnus,T) copyout(source)
-   !$omp target teams distribute parallel do simd collapse(3)
-   do inu = 1, nnu
+    !$acc                         parallel loop    collapse(3) copyin(nus,dnus,T) copyout(source)
+    !$omp target teams distribute parallel do simd collapse(3)
+    do inu = 1, nnu
       do ilay = 1, nlay
         do icol = 1, ncol
           source(icol, ilay, inu) = B_nu(T(icol, ilay), nus(inu)) * dnus(inu)

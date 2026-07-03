@@ -26,7 +26,7 @@ contains
               intent(in)  :: play, tlay, dry_num
 ! VMRs might need to start at ngas = 0, with element 0 having value 0, to stand in for gases users haven't supplied
 !   otherwise we need to filter the
-    real(wp), intent(in)  :: vmrs(ngas, ncol, nlay)
+    real(wp), intent(in)  :: vmrs(0:ngas, ncol, nlay)
 
     ! Functional approximations to cross-sections
     integer,  intent(in) :: fax_ngas
