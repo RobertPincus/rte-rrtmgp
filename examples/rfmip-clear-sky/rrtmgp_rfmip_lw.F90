@@ -182,6 +182,7 @@ program rrtmgp_rfmip_lw
     flxup_file = 'rlu_ddq_rfmip-rad-irf.nc'
     !
     ! These variables are needed for the fragile RFMIP IO
+    !   These are the names of the global mean fields in the gas optics respectively RFMIP files
     !
     kdist_gas_names = ["co2  ",             "n2o  ",            "ch4  ",        &
                        "o2   ",             "n2   ",            "cfc11", "cfc12"]
