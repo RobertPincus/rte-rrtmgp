@@ -109,8 +109,10 @@ contains
             cfrgn = (mtckd_T0/tlay(icol, ilay))                       &
                   * (play(icol, ilay)/mtckd_p0) * (1._wp - vmr)       &
                   * mtckd_cfrgn(igas, inu)
-            R = nus(inu) * tanh((planck_h * lightspeed * nus(inu)) &
-                             / (2._wp * boltzmann_k * tlay(icol, ilay)))
+            ! nu supplied in kaysers (cm^-1); convert to MKS
+            R = 100._wp * nus(inu) &
+              * tanh((planck_h * lightspeed * 100._wp * nus(inu)) &
+                     / (2._wp * boltzmann_k * tlay(icol, ilay)))
            t = t                   &
              + R * (cself + cfrgn) &
              * (vmr * num_density)

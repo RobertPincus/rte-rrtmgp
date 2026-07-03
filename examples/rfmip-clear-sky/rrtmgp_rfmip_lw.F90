@@ -183,8 +183,10 @@ program rrtmgp_rfmip_lw
     !
     ! These variables are needed for the fragile RFMIP IO
     !
-    kdist_gas_names = ["co2"]
-    rfmip_gas_games = ["carbon_dioxide"]
+    kdist_gas_names = ["co2  ",             "n2o  ",            "ch4  ",        &
+                       "o2   ",             "n2   ",            "cfc11", "cfc12"]
+    rfmip_gas_games = ["carbon_dioxide",    "nitrous_oxide ",   "methane       ", &
+                       "oxygen        ",    "nitrogen      ",   "cfc11         ", "cfc12         "]
   end if
   !
   ! How big is the problem? Does it fit into blocks of the size we've specified?
