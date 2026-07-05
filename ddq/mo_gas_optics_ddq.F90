@@ -518,11 +518,11 @@ contains
     end if
 
     if(present(rayleigh_xsec)) then
-      if (.not. extents_are(rayleigh_xsec, fax_nspecies)) &
+      if (.not. extents_are(rayleigh_xsec, nnu)) &
         error_msg = "rayleigh_xsec should have same extents as nus"
     end if
     if(present(solar_source)) then
-      if (.not. extents_are(solar_source, fax_nspecies)) &
+      if (.not. extents_are(solar_source, nnu)) &
         error_msg = "solar_source should have same extents as nus"
     end if
     if(error_msg /= "") return
@@ -536,7 +536,7 @@ contains
              this%fax_b(0:fax_norder, fax_nspecies, nnu), &
              this%fax_c(0:fax_nterms, fax_nspecies, nnu), &
              this%fax_sigma0(         fax_nspecies, nnu), &
-             this%fax_S (nnu))
+             this%fax_S (             fax_nspecies))
     this%fax_species_names = fax_species_names
     this%fax_a = fax_a
     this%fax_b = fax_b
