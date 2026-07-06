@@ -112,12 +112,12 @@ contains
     !   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
     ! gas_optics%load() returns a string; a non-empty string indicates an error.
     !
-    if(var_exists(ncid, 'solar_spectral_radiance')) then
+    if(var_exists(ncid, 'solar_spectral_irradiance')) then
       !
       ! Cheating a bit, expecting rayleigh_xsec and solar_spectral_radiance to be present together
       !
       rayleigh_xsec = read_field(ncid, 'rayleigh_xsec', nnu)
-      solar_source = read_field(ncid, 'solar_source', nnu)
+      solar_source = read_field(ncid, 'solar_spectral_irradiance', nnu)
       call stop_on_err(gas_optics%load( &
                       nus, weights,     &
                       fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
