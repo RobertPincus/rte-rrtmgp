@@ -46,7 +46,8 @@ contains
     integer,  intent(in) :: mtckd_num_index(mtckd_ngas)
     real(wp), dimension(mtckd_ngas, nnu), &
               intent(in) :: mtckd_cself, mtckd_cfrgn, mtckd_n
-    real(wp), intent(in) :: mtckd_T0, mtckd_p0
+    real(wp), dimension(mtckd_ngas), &
+              intent(in) :: mtckd_T0, mtckd_p0
 
     real(wp), intent(out) :: tau(ncol, nlay, nnu)
     ! -----------------
@@ -103,11 +104,11 @@ contains
           !
           do igas = 1, mtckd_ngas
             vmr = vmrs(mtckd_num_index(igas), icol, ilay)
-            cself = (mtckd_T0/tlay(icol, ilay))**(mtckd_n(igas, inu)) &
-                  * (play(icol, ilay)/mtckd_p0) * vmr                 &
+            cself = (mtckd_T0(igas)/tlay(icol, ilay))**(mtckd_n(igas, inu)) &
+                  * (play(icol, ilay)/mtckd_p0(igas)) * vmr                 &
                   * mtckd_cself(igas, inu)
-            cfrgn = (mtckd_T0/tlay(icol, ilay))                       &
-                  * (play(icol, ilay)/mtckd_p0) * (1._wp - vmr)       &
+            cfrgn = (mtckd_T0(igas)/tlay(icol, ilay))                       &
+                  * (play(icol, ilay)/mtckd_p0(igas)) * (1._wp - vmr)       &
                   * mtckd_cfrgn(igas, inu)
             ! nu supplied in kaysers (cm^-1); convert to MKS
             R = 100._wp * nus(inu) &
