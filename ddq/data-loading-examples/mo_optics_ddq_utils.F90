@@ -54,7 +54,7 @@ contains
     ! MT_CKD continuum absorption (mtckd)
     character(len=gas_name_len), allocatable :: mtckd_species_names(:)
     real(wp),         allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
-    real(wp),         allocatable :: mtckd_T0(:), mtckd_p0(:) ! (nspecies), reference temperature and pressure for mtckd continuua
+    real(wp)                      :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Splar source function
     real(wp), allocatable :: rayleigh_xsec(:) ! (nnu)
@@ -103,8 +103,8 @@ contains
     mtckd_cself = read_field(ncid, 'mtckd_cself', mtckd_nspecies, nnu)
     mtckd_cfrgn = read_field(ncid, 'mtckd_cfrgn', mtckd_nspecies, nnu)
     mtckd_n     = read_field(ncid, 'mtckd_n',     mtckd_nspecies, nnu)
-    mtckd_T0    = read_field(ncid, 'mtckd_T0', mtckd_nspecies)
-    mtckd_p0    = read_field(ncid, 'mtckd_p0', mtckd_nspecies)
+    mtckd_T0    = read_scalar(ncid, 'mtckd_T0')
+    mtckd_p0    = read_scalar(ncid, 'mtckd_p0')
 
     ! --------------------------------------------------
     !

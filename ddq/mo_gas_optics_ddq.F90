@@ -81,7 +81,7 @@ module mo_gas_optics_ddq
     character(len=gas_name_len), &
               allocatable :: mtckd_species_names(:)
     real(wp), allocatable :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
-    real(wp), allocatable :: mtckd_T0(:), mtckd_p0(:) ! (nspecies), reference temperature and pressure for mtckd continuua
+    real(wp)              :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Rayleigh
     ! -------------------------------------
@@ -477,7 +477,7 @@ contains
     ! MT_CKD continuum absorption (mtckd)
     character(len=*), intent(in) :: mtckd_species_names(:)
     real(wp),         intent(in) :: mtckd_cself(:, :), mtckd_cfrgn(:, :), mtckd_n(:, :) ! self- and foreign continuua
-    real(wp),         intent(in) :: mtckd_T0(:), mtckd_p0(:) ! (nspecies)
+    real(wp),         intent(in) :: mtckd_T0, mtckd_p0
     ! -------------------------------------
     ! Rayleigh cross-sections
     real(wp), optional, &
@@ -527,10 +527,7 @@ contains
     if(mtckd_nspecies > 0) then
       if (.not. extents_are(mtckd_cself, mtckd_nspecies, nnu) .or.  &
           .not. extents_are(mtckd_cfrgn, mtckd_nspecies, nnu) .or. &
-          .not. extents_are(mtckd_n,     mtckd_nspecies, nnu) .or. &
-          .not. extents_are(mtckd_cfrgn, mtckd_nspecies, nnu) .or. &
-          .not. extents_are(mtckd_T0,    mtckd_nspecies) .or. &
-          .not. extents_are(mtckd_p0,    mtckd_nspecies)) &
+          .not. extents_are(mtckd_n,     mtckd_nspecies, nnu)) &
         error_msg = "Wrong dimensions for mtckd arrays"
     end if
 
