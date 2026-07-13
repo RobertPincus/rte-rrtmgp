@@ -1070,7 +1070,7 @@ contains
                                  allocatable :: rayl_lower, rayl_upper
     character(len = 128) err_message
 
-    integer :: ngpt
+    integer :: ngpt,igpt
     ! ----
     !$acc enter data copyin(this)
     call this%finalize()
@@ -1103,6 +1103,7 @@ contains
                this%solar_source_sunspot(ngpt), this%solar_source(ngpt))
       !$acc        enter data create(   this%solar_source_quiet, this%solar_source_facular, this%solar_source_sunspot, this%solar_source)
       !$omp target enter data map(alloc:this%solar_source_quiet, this%solar_source_facular, this%solar_source_sunspot, this%solar_source)
+#ifndef AMDFLANG_WORKAROUND
       !$acc kernels
       !$omp target
       this%solar_source_quiet   = solar_quiet
@@ -1110,6 +1111,14 @@ contains
       this%solar_source_sunspot = solar_sunspot
       !$acc end kernels
       !$omp end target
+#else
+      !$omp target teams distribute parallel do
+      do igpt = 1, ngpt
+         this%solar_source_quiet(igpt)   = solar_quiet(igpt)
+         this%solar_source_facular(igpt) = solar_facular(igpt)
+         this%solar_source_sunspot(igpt) = solar_sunspot(igpt)
+      end do
+#endif
       err_message = this%set_solar_variability(mg_default, sb_default)
     endif
   end function load_ext

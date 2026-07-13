@@ -36,7 +36,7 @@ jobs:
       # Cache Conda packages
       #
       - name: Cache Conda packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/conda_pkgs_dir
           key: conda-pkgs-${{ matrix.os }}
@@ -44,7 +44,7 @@ jobs:
       # Set up Conda
       #
       - name: Set up Conda (testing scripts only)
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           activate-environment: rte_rrtmgp_test

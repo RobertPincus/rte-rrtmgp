@@ -96,7 +96,7 @@ jobs:
     #
     - name: Upload validation plots
       if: matrix.fortran-compiler == 'ifx' && matrix.rte-kernels == 'default' && matrix.fpmodel == 'DP'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: valdiation-plot
         path: build/tests/validation-figures.pdf

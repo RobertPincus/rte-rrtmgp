@@ -126,6 +126,7 @@ contains
     !
     integer     :: ncol, nlay, ngpt, nband
     integer     :: icol, ilev
+    integer     :: i,j,k
     logical(wl) :: has_dif_bc, do_broadband
 
     real(wp), dimension(:,:,:), pointer             :: gpt_flux_up, gpt_flux_dn, gpt_flux_dir
@@ -294,11 +295,22 @@ contains
                                 gpt_flux_dir)
           call zero_array(ncol, nlay+1, ngpt, gpt_flux_up)
           !
+#ifndef AMDFLANG_WORKAROUND
           !$acc kernels
           !$omp target
           gpt_flux_dn(:,:,:) = gpt_flux_dir(:,:,:)
           !$acc end kernels
           !$omp end target
+#else
+          !$omp target teams distribute parallel do collapse(3)
+          do k = 1, size(gpt_flux_dn, 3)
+             do j = 1, size(gpt_flux_dn, 2)
+                do i = 1, size(gpt_flux_dn, 1)
+                   gpt_flux_dn(i,j,k) = gpt_flux_dir(i,j,k)
+                end do
+             end do
+          end do
+#endif
 
         class is (ty_optical_props_2str)
           !

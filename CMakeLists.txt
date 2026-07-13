@@ -50,6 +50,12 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL GNU AND NOT RTE_RRTMGP_Fortran_is_NEC)
   add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-ffree-line-length-none>)
 endif()
 
+if(${CMAKE_Fortran_COMPILER_ID} MATCHES LLVMFlang)
+  # replace parameter local array in kernel by module global array use explicit
+  # openmp target loops
+  add_compile_definitions(AMDFLANG_WORKAROUND)
+endif()
+
 set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
 
 if(RTE_BUILD_TESTING OR RTE_BUILD_C_HEADERS)

@@ -58,7 +58,6 @@ program rrtmgp_rfmip_lw
   use mo_gas_optics,         only: ty_gas_optics
   use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
   use mo_optics_ssm,         only: ty_optics_ssm
-  use mo_gas_optics_ddq,     only: ty_gas_optics_ddq
   !
   ! modules for reading and writing files
   !
@@ -66,10 +65,9 @@ program rrtmgp_rfmip_lw
                                    read_and_block_lw_bc, determine_gas_names
   use mo_testing_utils,      only: stop_on_err
   !
-  ! Some gas optics class needs to be initialized with data read from a netCDF files
+  ! RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
   !
-  use mo_optics_utils_rrtmgp,only: load_gas_optics_rrtmgp => load_gas_optics
-  use mo_optics_ddq_utils,   only: load_gas_optics_ddq    => load_gas_optics
+  use mo_optics_utils_rrtmgp,only: load_gas_optics
 
   implicit none
   ! --------------------------------------------------
@@ -79,12 +77,11 @@ program rrtmgp_rfmip_lw
   character(len=512) :: invoked_name
   character(len=512) :: rfmip_file = 'multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc'
   character(len=512) :: kdist_file = 'coefficients_lw.nc'
-  character(len=512) :: ddq_file   = 'gas_optics_lw.nc'
   character(len=132) :: flxdn_file, flxup_file
   integer            :: nargs, ncol, nlay, nbnd, nexp, nblocks, block_size, forcing_index, physics_index, n_quad_angles = 1
   integer            :: b, icol, ibnd
   character(len=4)   :: block_size_char, forcing_index_char = '1', physics_index_char = '1'
-  logical            :: do_rrtmgp, do_ssm, do_ddq
+  logical            :: do_rrtmgp, do_ssm
 
   character(len=32 ), &
             dimension(:),             allocatable :: kdist_gas_names, rfmip_gas_games
@@ -116,15 +113,13 @@ program rrtmgp_rfmip_lw
   !
   ! Determine which gas optics to use based on the name by which the program is evoked
   !   (possibly fragile)
-  ! Based on the possibilities: rrtmgp_rfmip_lw, ssm_rfmip_lw, ddq_rfmip_lw (with or without .exe on Windows)
+  ! Based on the possibilities: rrtmgp_rfmip_lw, ssm_rfmip_lw (with or without .exe on Windows)
   call get_command_argument(0, invoked_name)
   do_rrtmgp = (invoked_name(len_trim(invoked_name)-14:len_trim(invoked_name)-8 ) == "rrtmgp_" .or. &
                invoked_name(len_trim(invoked_name)-18:len_trim(invoked_name)-12) == "rrtmgp_")
   do_ssm    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ssm_"    .or. &
                invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ssm_")
-  do_ddq    = (invoked_name(len_trim(invoked_name)-11:len_trim(invoked_name)-8 ) == "ddq_"    .or. &
-               invoked_name(len_trim(invoked_name)-15:len_trim(invoked_name)-12) == "ddq_")
-  if (.not. (do_rrtmgp .or. do_ssm .or. do_ddq)) call stop_on_err("Don't recogize which optics to use")
+  if (.not. (do_rrtmgp .or. do_ssm)) call stop_on_err("Don't recogize which optics to use")
 
   nargs = command_argument_count()
   if(nargs >= 2) call get_command_argument(2, rfmip_file)
@@ -174,21 +169,8 @@ program rrtmgp_rfmip_lw
     !
     kdist_gas_names = ["co2"]
     rfmip_gas_games = ["carbon_dioxide"]
-  else if (do_ddq) then
-    allocate(ty_gas_optics_ddq::gas_optics)
-    print *, "Usage: ddq_rfmip_lw [block_size] [rfmip_file] [ddq_file]"
-    if(nargs >= 3) call get_command_argument(3, ddq_file)
-    flxdn_file = 'rld_ddq_rfmip-rad-irf.nc'
-    flxup_file = 'rlu_ddq_rfmip-rad-irf.nc'
-    !
-    ! These variables are needed for the fragile RFMIP IO
-    !   These are the names of the global mean fields in the gas optics respectively RFMIP files
-    !
-    kdist_gas_names = ["co2  ",             "n2o  ",            "ch4  ",        &
-                       "o2   ",             "n2   ",            "cfc11", "cfc12"]
-    rfmip_gas_games = ["carbon_dioxide",    "nitrous_oxide ",   "methane       ", &
-                       "oxygen        ",    "nitrogen      ",   "cfc11         ", "cfc12         "]
   end if
+
   !
   ! How big is the problem? Does it fit into blocks of the size we've specified?
   !
@@ -216,7 +198,7 @@ program rrtmgp_rfmip_lw
       ! Read k-distribution information. load_gas_optics() reads data from netCDF and calls
       !   gas_optics%init(); users might want to use their own reading methods
       !
-      call load_gas_optics_rrtmgp(gas_optics, trim(kdist_file), gas_conc_array(1))
+      call load_gas_optics(gas_optics, trim(kdist_file), gas_conc_array(1))
       if(.not. gas_optics%source_is_internal()) &
         stop "rrtmgp_rfmip_lw: k-distribution file isn't LW"
       !
@@ -233,11 +215,10 @@ program rrtmgp_rfmip_lw
       end if
     type is (ty_optics_ssm)
       call stop_on_err(gas_optics%configure())
-    type is (ty_gas_optics_ddq)
-      call load_gas_optics_ddq(gas_optics, trim(ddq_file))
   end select
   nbnd = gas_optics%get_nband()
   print *, "number of bands is", nbnd
+
   !
   ! Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
   !   gas optical properties, and source functions. The %alloc() routines carry along
@@ -306,9 +287,6 @@ program rrtmgp_rfmip_lw
   !$omp target exit data map(release:source%lay_source, source%lev_source, source%sfc_source)
   !$acc exit data delete(source)
   ! --------------------------------------------------m
-    print *, "Full range of broadband fluxes: ", &
-      minval(flux_up), maxval(flux_up), &
-      minval(flux_dn), maxval(flux_dn)
   call unblock_and_write(trim(flxup_file), 'rlu', flux_up)
   call unblock_and_write(trim(flxdn_file), 'rld', flux_dn)
 end program rrtmgp_rfmip_lw

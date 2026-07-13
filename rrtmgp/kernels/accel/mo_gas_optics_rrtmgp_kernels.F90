@@ -66,7 +66,7 @@ contains
     real(wp) :: ftemp_term
     ! -----------------
     ! local indexes
-    integer :: icol, ilay, iflav, igases(2), itropo, itemp
+    integer :: icol, ilay, iflav, igases(2), itropo, itemp, k
 
     !$acc data copyin(flavor,press_ref_log,temp_ref,vmr_ref,play,tlay,col_gas) &
     !$acc      copyout(jtemp,jpress,tropo,jeta,col_mix,fmajor,fminor) &
@@ -104,7 +104,13 @@ contains
         ! loop over implemented combinations of major species
         do icol = 1, ncol
           do itemp = 1, 2
+#ifndef AMDFLANG_WORKAROUND
             igases(:) = flavor(:,iflav)
+#else
+            do k=1,2
+               igases(k) = flavor(k,iflav)
+            end do
+#endif
             ! itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
             itropo = merge(1,2,tropo(icol,ilay))
             ! compute interpolation fractions needed for lower, then upper reference temperature level
@@ -131,7 +137,12 @@ contains
             endif
             loceta = eta * float(neta-1)
             jeta(itemp,icol,ilay,iflav) = min(int(loceta)+1, neta-1)
+#ifndef AMDFLANG_WORKAROUND
             feta = mod(loceta, 1.0_wp)
+#else
+            ! mod(A,P) -> A - ((int(A/P)*P)
+            feta = loceta - int(loceta)
+#endif
             ! compute interpolation fractions needed for minor species
             ! ftemp_term = (1._wp-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
             ftemp_term = (real(2-itemp, wp) + real(2*itemp-3, wp) * ftemp(icol,ilay))

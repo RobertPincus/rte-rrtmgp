@@ -99,7 +99,7 @@ contains
     ! Local variables
     !
     integer :: nrghice, nsize_liq, nsize_ice
-    integer :: ngpt
+    integer :: ngpt,i,j,k
 
     error_msg = this%init(band_lims_wvn, band_lims_gpt, name="RRTMGP cloud optics")
     !
@@ -152,6 +152,7 @@ contains
     this%diamice_upr = diamice_upr
 
     ! Load LUT coefficients
+#ifndef AMDFLANG_WORKAROUND
     !$acc kernels
     !$omp target
     this%extliq = extliq
@@ -162,6 +163,50 @@ contains
     this%asyice = asyice
     !$acc end kernels
     !$omp end target
+#else
+    !$omp target teams distribute parallel do collapse(2)
+    do j = 1, size(extliq, 2)
+       do i = 1, size(extliq, 1)
+          this%extliq(i,j) = extliq(i,j)
+       end do
+    end do
+    !$omp target teams distribute parallel do collapse(2)
+    do j = 1, size(ssaliq, 2)
+       do i = 1, size(ssaliq, 1)
+          this%ssaliq(i,j) = ssaliq(i,j)
+       end do
+    end do
+    !$omp target teams distribute parallel do collapse(2)
+    do j = 1, size(asyliq, 2)
+       do i = 1, size(asyliq, 1)
+          this%asyliq(i,j) = asyliq(i,j)
+       end do
+    end do
+    !$omp target teams distribute parallel do collapse(3)
+    do k = 1, size(extice, 3)
+       do j = 1, size(extice, 2)
+          do i = 1, size(extice, 1)
+             this%extice(i,j,k) = extice(i,j,k)
+          end do
+       end do
+    end do
+    !$omp target teams distribute parallel do collapse(3)
+    do k = 1, size(ssaice, 3)
+       do j = 1, size(ssaice, 2)
+          do i = 1, size(ssaice, 1)
+             this%ssaice(i,j,k) = ssaice(i,j,k)
+          end do
+       end do
+    end do
+    !$omp target teams distribute parallel do collapse(3)
+    do k = 1, size(asyice, 3)
+       do j = 1, size(asyice, 2)
+          do i = 1, size(asyice, 1)
+             this%asyice(i,j,k) = asyice(i,j,k)
+          end do
+       end do
+    end do
+#endif
     !
     ! Set default ice roughness - min values
     !

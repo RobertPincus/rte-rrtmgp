@@ -61,7 +61,16 @@ module mo_rte_lw
   private
 
   public :: rte_lw
+
+#ifdef AMDFLANG_WORKAROUND
+  integer, parameter :: max_gauss_pts = 4
+  real(wp), dimension(max_gauss_pts, max_gauss_pts) :: gauss_Ds, gauss_wts
+  !$omp declare target(gauss_Ds, gauss_wts)
+  !$acc declare create(gauss_Ds, gauss_wts)
+#endif
+
 contains
+
   ! --------------------------------------------------
   !
   ! Interface using only optical properties and source functions as inputs; fluxes as outputs.
@@ -126,9 +135,11 @@ contains
     ! Weights and angle secants for "Gauss-Jacobi-5" quadrature.
     !   Values from Table 1, R. J. Hogan 2023, doi:10.1002/qj.4598
     !
+#ifndef AMDFLANG_WORKAROUND
     integer,  parameter :: max_gauss_pts = 4
     real(wp), parameter,                         &
       dimension(max_gauss_pts, max_gauss_pts) :: &
+#endif
         !
         ! Values provided are for mu = cos(theta); we require the inverse
         !
@@ -137,7 +148,11 @@ contains
                              1._wp/0.1024922169_wp, 1._wp/0.4417960320_wp, 1._wp/0.8633751621_wp, 0._wp, &
                              1._wp/0.0454586727_wp, 1._wp/0.2322334416_wp,  &
                              1._wp/0.5740198775_wp, 1._wp/0.9030775973_wp], &
-                            [max_gauss_pts, max_gauss_pts]),              &
+                            [max_gauss_pts, max_gauss_pts])
+#ifndef AMDFLANG_WORKAROUND
+    real(wp), parameter,                         &
+      dimension(max_gauss_pts, max_gauss_pts) :: &
+#endif
         gauss_wts = RESHAPE([1._wp,           0._wp,           0._wp,           0._wp, &
                              0.2300253764_wp, 0.7699746236_wp, 0._wp,           0._wp, &
                              0.0437820218_wp, 0.3875796738_wp, 0.5686383044_wp, 0._wp, &
@@ -246,7 +261,6 @@ contains
         error_msg = trim(optical_props%get_name()) // ': ' // trim(error_msg)
       return
     end if
-
     ! ------------------------------------------------------------------------------------
     !  Boundary conditions
     !    Lower boundary condition -- expand surface emissivity by band to gpoints

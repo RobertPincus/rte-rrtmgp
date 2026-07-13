@@ -581,14 +581,25 @@ contains
     integer, dimension(:,:), intent(in) :: array
     integer,                 intent(in) :: checkMin, checkMax
 
-    integer :: minValue, maxValue
+    integer :: minValue, maxValue, i, j
 
+#ifndef AMDFLANG_WORKAROUND
     !$acc kernels copyin(array)
     !$omp target map(to:array) map(from:minValue, maxValue)
     minValue = minval(array)
     maxValue = maxval(array)
     !$acc end kernels
     !$omp end target
+#else
+    !$omp target teams distribute parallel do collapse(2) &
+    !$omp& reduction(min:minValue) reduction(max:maxValue) map(to:array)
+    do j = 1, size(array, 2)
+       do i = 1, size(array, 1)
+          minValue = min(array(i,j), minValue)
+          maxValue = max(array(i,j), maxValue)
+       end do
+    end do
+#endif
     any_int_vals_outside_2D = minValue < checkMin .or. maxValue > checkMax
 
   end function any_int_vals_outside_2D

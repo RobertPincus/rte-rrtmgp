@@ -12,3 +12,4 @@ set(FAILURE_THRESHOLD
 add_subdirectory(shared-utils)
 add_subdirectory(all-sky)
 add_subdirectory(rfmip-clear-sky)
+add_subdirectory(rte-examples)

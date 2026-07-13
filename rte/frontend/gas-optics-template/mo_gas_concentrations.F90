@@ -134,7 +134,7 @@ contains
     character(len=128)                 :: error_msg !! error string, empty when successful
     ! ---------
     real(wp), dimension(:,:), pointer :: p
-    integer :: igas
+    integer :: igas,i,j
     ! ---------
     error_msg = ''
     if (w < 0._wp .or. w > 1._wp) then
@@ -167,14 +167,27 @@ contains
 
     p => this%concs(igas)%conc(:,:)
     !$acc kernels
+#ifndef AMDFLANG_WORKAROUND
     !$omp target map(to:w)
+#endif
 #ifdef _CRAYFTN
     p(:,:) = w
 #else
-    this%concs(igas)%conc(:,:) = w
+#ifndef AMDFLANG_WORKAROUND
+    this%concs(igas)%conc(1,:) = w
+#else
+    !$omp target teams distribute parallel do collapse(2) map(to:w)
+    do j = 1, size(this%concs(igas)%conc, 2)
+       do i = 1, size(this%concs(igas)%conc, 1)
+          this%concs(igas)%conc(i,j) = w
+       end do
+    end do
+#endif
 #endif
     !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
     !$omp end target
+#endif
   end function set_vmr_scalar
   ! -------------------------------------------------------------------------------------
   !> ### Set 1d (function of level) concentrations
@@ -187,7 +200,7 @@ contains
     character(len=128)                 :: error_msg !! error string, empty when successful
     ! ---------
     real(wp), dimension(:,:), pointer :: p
-    integer :: igas
+    integer :: igas,i
     ! ---------
     error_msg = ''
 
@@ -227,14 +240,25 @@ contains
 
     p => this%concs(igas)%conc(:,:)
     !$acc kernels copyin(w)
+#ifndef AMDFLANG_WORKAROUND
     !$omp target map(to:w)
+#endif
 #ifdef _CRAYFTN
     p(1,:) = w
 #else
+#ifndef AMDFLANG_WORKAROUND
     this%concs(igas)%conc(1,:) = w
+#else
+    !$omp target teams distribute parallel do map(to:w)
+    do i = 1, size(this%concs(igas)%conc, 2)
+       this%concs(igas)%conc(1,i) = w(i)
+    end do
+#endif
 #endif
     !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
     !$omp end target
+#endif
 
     !$acc exit data delete(w)
   end function set_vmr_1d
@@ -250,7 +274,7 @@ contains
                                               !! error string, empty when successful
     ! ---------
     real(wp), dimension(:,:), pointer :: p
-    integer :: igas
+    integer :: igas,i,j
     ! ---------
     error_msg = ''
 
@@ -297,14 +321,27 @@ contains
 
     p => this%concs(igas)%conc(:,:)
     !$acc kernels copyin(w)
+#ifndef AMDFLANG_WORKAROUND
     !$omp target map(to:w)
+#endif
 #ifdef _CRAYFTN
     p(:,:) = w(:,:)
 #else
+#ifndef AMDFLANG_WORKAROUND
     this%concs(igas)%conc(:,:) = w(:,:)
+#else
+    !$omp target teams distribute parallel do collapse(2) map(to:w)
+    do j = 1, size(this%concs(igas)%conc, 2)
+       do i = 1, size(this%concs(igas)%conc, 1)
+          this%concs(igas)%conc(i,j) = w(i,j)
+       end do
+    end do
+#endif
 #endif
     !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
     !$omp end target
+#endif
   end function set_vmr_2d
   ! -------------------------------------------------------------------------------------
   !
@@ -321,7 +358,7 @@ contains
     character(len=128) :: error_msg                !! Error string, empty if successful
     ! ---------------------
     real(wp), dimension(:,:), pointer :: p
-    integer :: igas
+    integer :: igas,i
     ! ---------------------
     error_msg = ''
 
@@ -344,24 +381,46 @@ contains
     !$omp target data map(from:array)
     if(size(this%concs(igas)%conc, 2) > 1) then
       !$acc kernels present(p)
+#ifndef AMDFLANG_WORKAROUND
       !$omp target
+#endif
 #ifdef _CRAYFTN
       array(:) = p(1,:)
 #else
+#ifndef AMDFLANG_WORKAROUND
       array(:) = this%concs(igas)%conc(1,:)
+#else
+      !$omp target teams distribute parallel do
+      do i = 1, size(array, 1)
+         array(i) = this%concs(igas)%conc(1,i)
+      end do
+#endif
 #endif
       !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
       !$omp end target
+#endif
     else
       !$acc kernels present(p)
+#ifndef AMDFLANG_WORKAROUND
       !$omp target
+#endif
 #ifdef _CRAYFTN
       array(:) = p(1,1)
 #else
+#ifndef AMDFLANG_WORKAROUND
       array(:) = this%concs(igas)%conc(1,1)
+#else
+      !$omp target teams distribute parallel do
+      do i = 1, size(array, 1)
+         array(i) = this%concs(igas)%conc(1,1)
+      end do
+#endif
 #endif
       !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
       !$omp end target
+#endif
     end if
     !$acc end data
     !$omp end target data
@@ -455,7 +514,7 @@ contains
     character(len=128)                      :: error_msg !! Error string, empty if successful
     ! ---------------------
     real(wp), dimension(:,:), pointer :: p1, p2
-    integer :: i
+    integer :: i,j,k
     ! ---------------------
     error_msg = ''
     if(n <= 0) &
@@ -488,24 +547,50 @@ contains
       !$omp target enter data map(alloc:subset%concs(i)%conc)
       if(size(this%concs(i)%conc, 1) > 1) then      ! Concentration stored as 2D
         !$acc kernels
+#ifndef AMDFLANG_WORKAROUND
         !$omp target
+#endif
 #ifdef _CRAYFTN
         p1(:,:) = p2(start:(start+n-1),:)
 #else
+#ifndef AMDFLANG_WORKAROUND
         subset%concs(i)%conc(:,:) = this%concs(i)%conc(start:(start+n-1),:)
+#else
+        !$omp target teams distribute parallel do collapse(2)
+        do k = 1, size(subset%concs(i)%conc, 2)
+           do j = 1, size(subset%concs(i)%conc, 1)
+              subset%concs(i)%conc(j,k) = this%concs(i)%conc(start+j-1, k)
+           end do
+        end do
+#endif
 #endif
         !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
         !$omp end target
+#endif
       else
         !$acc kernels
+#ifndef AMDFLANG_WORKAROUND
         !$omp target
+#endif
 #ifdef _CRAYFTN
         p1(:,:) = p2(:,:)
 #else
+#ifndef AMDFLANG_WORKAROUND
         subset%concs(i)%conc(:,:) = this%concs(i)%conc(:,:)
+#else
+        !$omp target teams distribute parallel do collapse(2)
+        do k = 1, size(subset%concs(i)%conc, 2)
+           do j = 1, size(subset%concs(i)%conc, 1)
+              subset%concs(i)%conc(j,k) = this%concs(i)%conc(j, k)
+           end do
+        end do
+#endif
 #endif
         !$acc end kernels
+#ifndef AMDFLANG_WORKAROUND
         !$omp end target
+#endif
       end if
     end do
 

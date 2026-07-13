@@ -315,18 +315,16 @@ contains
     end if
   end subroutine create_dim
   !--------------------------------------------------------------------------------------------------------------------
-  subroutine create_var(ncid, varName, dimNames, dimLengths, dataType)
+  subroutine create_var(ncid, varName, dimNames, dimLengths)
     !
     ! Check to see if a variable with this name exists in the file
     !   If so, check against current size
     !   If not, create with specified dimensions
-    ! datatype: NF90_DOUBLE, NF90_FLOAT, NF90_INT, etc.
     !
     integer,          intent(in) :: ncid
     character(len=*), intent(in) :: varName
     character(len=*), intent(in) :: dimNames(:)
     integer,          intent(in) :: dimLengths(:)
-    integer, optional, intent(in) :: dataType
 
     integer :: i, varid, xtype
     integer :: dimIds(size(dimNames))
@@ -344,7 +342,6 @@ contains
       if(nf90_redef(ncid) /= NF90_NOERR) &
         call stop_on_err("create_var: can't put file into redefine mode")
       xtype = NF90_DOUBLE
-      if(present(dataType)) xtype = dataType
       if(nf90_def_var(ncid, varName, xtype, dimIds, varid) /= NF90_NOERR) &
         call stop_on_err("create_var: can't define variable " // trim(varName))
       if(nf90_enddef(ncid) /= NF90_NOERR) &
