@@ -59,7 +59,7 @@ jobs:
     # Check out repository under $GITHUB_WORKSPACE
     #
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     #
     # Install required tools
     #

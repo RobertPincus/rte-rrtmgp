@@ -13,7 +13,7 @@ jobs:
     #
     # Checks-out repository under $GITHUB_WORKSPACE
     #
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     #
     # Install dependencies
     #
@@ -38,7 +38,7 @@ jobs:
     # Deploy
     #
     - name: Deploy to Github Pages
-      uses: JamesIves/github-pages-deploy-action@v4.7.3
+      uses: JamesIves/github-pages-deploy-action@v4
       if: ${{ github.event_name == 'push'  &&  github.ref == 'refs/heads/main' }}
       with:
         branch: gh-pages
@@ -48,7 +48,7 @@ jobs:
    # Deploy from workflow dispatch
    #
     - name: Deploy to Github Pages from workflow_dispatch
-      uses: JamesIves/github-pages-deploy-action@v4.7.3
+      uses: JamesIves/github-pages-deploy-action@v4
       if: ${{ github.event_name == 'workflow_dispatch' }}
       with:
         branch: gh-pages

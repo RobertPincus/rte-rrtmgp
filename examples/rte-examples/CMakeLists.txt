@@ -90,30 +90,53 @@ target_link_libraries(
 # RTE tests: 2 schemes x 2 bands x 3 states = 12 tests
 #
 foreach(scheme IN ITEMS rrtmgp ssm)
+  if(scheme STREQUAL "rrtmgp")
+    set(data_dir ${RRTMGP_DATA})
+  else() # ssm
+    set(data_dir ${SSM_DATA})
+  endif()
+
   foreach(band IN ITEMS lw sw)
     # scheme_data depends on scheme and band
     if(scheme STREQUAL "rrtmgp")
       if(band STREQUAL "lw")
-        set(scheme_data ${RRTMGP_DATA}/rrtmgp-gas-lw-g256.nc)
+        set(scheme_data ${data_dir}/rrtmgp-gas-lw-g128.nc)
       else()
-        set(scheme_data ${RRTMGP_DATA}/rrtmgp-gas-sw-g224.nc)
+        set(scheme_data ${data_dir}/rrtmgp-gas-sw-g112.nc)
       endif()
     else() # ssm
       set(scheme_data ${band})
     endif()
 
     foreach(state IN ITEMS rfmip ckdmip rce)
+      set(output_data ${CMAKE_CURRENT_BINARY_DIR}/${scheme}-${band}-${state}.nc)
       add_test(
         NAME run_rte_examples_${scheme}_${band}_${state}
         COMMAND
           rte_examples 8 ${scheme} ${scheme_data}
-          ${RTE_EXAMPLES_DATA}/${state}-states.nc
-          ${CMAKE_CURRENT_BINARY_DIR}/${scheme}_${band}_${state}.nc
+          ${RTE_EXAMPLES_DATA}/${state}-states.nc ${output_data}
       )
       set_tests_properties(
         run_rte_examples_${scheme}_${band}_${state}
         PROPERTIES FIXTURES_REQUIRED
                    "fetch_rrtmgp_data;fetch_rte_examples_data"
+                   FIXTURES_SETUP
+                   "run_rte_examples_${scheme}_${band}_${state}"
+      )
+
+      add_test(
+        NAME check_rte_examples_${scheme}_${band}_${state}
+        COMMAND
+          ${Python3_EXECUTABLE}
+          ${CMAKE_SOURCE_DIR}/examples/compare-to-reference.py --ref_dir
+          ${data_dir}/examples/rte-examples/reference --tst_dir
+          ${CMAKE_CURRENT_BINARY_DIR} --file_names ${output_data}
+          --failure_threshold ${FAILURE_THRESHOLD}
+      )
+      set_tests_properties(
+        check_rte_examples_${scheme}_${band}_${state}
+        PROPERTIES FIXTURES_REQUIRED
+                   "fetch_ssm_data;run_rte_examples_${scheme}_${band}_${state}"
       )
     endforeach()
   endforeach()
