@@ -79,6 +79,7 @@ target_link_libraries(
   ${executable}
   PRIVATE ${executable}_io
           rrtmgp-load-data
+          ddq-load-data
           shared-utils
           rte-rrtmgp::rte
           rte-rrtmgp::rrtmgp
@@ -89,10 +90,12 @@ target_link_libraries(
 #
 # RTE tests: 2 schemes x 2 bands x 3 states = 12 tests
 #
-foreach(scheme IN ITEMS rrtmgp ssm)
+foreach(scheme IN ITEMS rrtmgp ssm ddq)
   if(scheme STREQUAL "rrtmgp")
     set(data_dir ${RRTMGP_DATA})
-  else() # ssm
+  elseif(scheme STREQUAL "ddq")
+    set(data_dir ${DDQ_DATA})
+  elseif(scheme STREQUAL "ssm")
     set(data_dir ${SSM_DATA})
   endif()
 
@@ -104,7 +107,13 @@ foreach(scheme IN ITEMS rrtmgp ssm)
       else()
         set(scheme_data ${data_dir}/rrtmgp-gas-sw-g112.nc)
       endif()
-    else() # ssm
+    elseif(scheme STREQUAL "ddq")
+      if(band STREQUAL "lw")
+        set(scheme_data ${data_dir}/gas_optics_lw.nc)
+      else()
+        set(scheme_data ${data_dir}/gas_optics_sw.nc)
+      endif()
+    elseif(scheme STREQUAL "ssm")
       set(scheme_data ${band})
     endif()
 
@@ -119,7 +128,7 @@ foreach(scheme IN ITEMS rrtmgp ssm)
       set_tests_properties(
         run_rte_examples_${scheme}_${band}_${state}
         PROPERTIES FIXTURES_REQUIRED
-                   "fetch_rrtmgp_data;fetch_rte_examples_data"
+                   "fetch_${scheme}_data;fetch_rte_examples_data"
                    FIXTURES_SETUP
                    "run_rte_examples_${scheme}_${band}_${state}"
       )
@@ -135,8 +144,9 @@ foreach(scheme IN ITEMS rrtmgp ssm)
       )
       set_tests_properties(
         check_rte_examples_${scheme}_${band}_${state}
-        PROPERTIES FIXTURES_REQUIRED
-                   "fetch_ssm_data;run_rte_examples_${scheme}_${band}_${state}"
+        PROPERTIES
+          FIXTURES_REQUIRED
+          "fetch_${scheme}_data;run_rte_examples_${scheme}_${band}_${state}"
       )
     endforeach()
   endforeach()
