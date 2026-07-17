@@ -49,3 +49,7 @@ else()
     fetch_rrtmgp_data PROPERTIES FIXTURES_SETUP fetch_rrtmgp_data
   )
 endif()
+
+# Propagate the resolved value to the parent so sibling subdirectories
+# (examples, tests) inherit it.
+set(RRTMGP_DATA "${RRTMGP_DATA}" PARENT_SCOPE)

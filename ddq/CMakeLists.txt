@@ -70,4 +70,8 @@ if(RTE_BUILD_TESTING)
     set(REF_DIR examples/rte-examples/reference)
 
   endif()
+
+  # Propagate the resolved value to the parent so sibling subdirectories
+  # (examples, tests) inherit it.
+  set(DDQ_DATA "${DDQ_DATA}" PARENT_SCOPE)
 endif()
