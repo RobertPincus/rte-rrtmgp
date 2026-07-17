@@ -142,7 +142,7 @@ contains
     do inu = 1, nnu
       do ilay = 1, nlay
         do icol = 1, ncol
-          t_r = dry_num(ncol, nlay) * rayleigh_xsec(inu)
+          t_r = dry_num(icol, ilay) * rayleigh_xsec(inu)
           t = tau(icol, ilay, inu)
           tau(icol, ilay, inu) = t + t_r
           ssa(icol, ilay, inu) = t_r/(t + t_r)
