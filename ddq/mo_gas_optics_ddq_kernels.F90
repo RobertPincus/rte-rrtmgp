@@ -117,7 +117,7 @@ contains
              + R * (cself + cfrgn) &
              * (vmr * num_density)
           end do
-          tau(icol, ilay, inu) = t
+          tau(icol, ilay, inu) = MAX(0._wp, t)
         end do
       end do
     end do
