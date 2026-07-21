@@ -6,6 +6,12 @@ project(
   LANGUAGES Fortran
 )
 
+# Use extraction-time timestamps for URL-based ExternalProject downloads so
+# dependent steps re-run when the download URL changes (CMake >= 3.24).
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
 option(RTE_BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(RTE_BUILD_C_HEADERS "Build c headers" OFF)
 option(RTE_BUILD_TESTING "Build tests" OFF)

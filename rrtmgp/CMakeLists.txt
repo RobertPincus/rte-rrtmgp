@@ -21,6 +21,7 @@ else()
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
+    LOG_DOWNLOAD TRUE
   )
 
   # The build already fetched the data (rrtmgp-data is part of the ALL target).
@@ -53,8 +54,8 @@ set_tests_properties(
   fetch_rrtmgp_data PROPERTIES FIXTURES_SETUP fetch_rrtmgp_data
 )
 
-# Propagate the resolved value to the parent so sibling subdirectories
-# (examples, tests) inherit it.
+# propagate the RRTMGP_DATA variable to the parent scope so that the sibling
+# subdirectories (examples, tests) can inherit it
 set(RRTMGP_DATA
     "${RRTMGP_DATA}"
     PARENT_SCOPE

@@ -37,6 +37,7 @@ else()
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
+    LOG_DOWNLOAD TRUE
   )
 
   # The build already fetched the data (rte-examples-data is part of the ALL
