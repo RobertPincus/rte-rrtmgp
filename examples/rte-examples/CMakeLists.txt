@@ -27,12 +27,11 @@ else()
   set(RTE_EXAMPLES_DATA "${PROJECT_BINARY_DIR}/rte-examples-data")
 
   include(ExternalProject)
+  # Fetched at build time (part of the default ALL target) so the data is
+  # present before install and before ctest.
   ExternalProject_Add(
     rte-examples-data
-    GIT_REPOSITORY https://github.com/earth-system-radiation/rte-examples.git
-    GIT_TAG "v0.1.1"
-    GIT_SHALLOW True
-    EXCLUDE_FROM_ALL True
+    URL https://github.com/earth-system-radiation/rte-examples/archive/refs/tags/v0.1.1.tar.gz
     PREFIX rte-examples-data-cmake
     SOURCE_DIR ${RTE_EXAMPLES_DATA}
     CONFIGURE_COMMAND ""
@@ -40,22 +39,17 @@ else()
     INSTALL_COMMAND ""
   )
 
-  set(fetch_rte_examples_data_command
-      ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config "$<CONFIG>"
-      --target rte-examples-data
-  )
-
+  # The build already fetched the data (rte-examples-data is part of the ALL
+  # target). This fixture verifies the files are present before any test that
+  # needs them runs, and fails with an actionable message if the project was not
+  # built first.
   add_test(
-    NAME fetch_rte_examples_data COMMAND ${fetch_rte_examples_data_command}
-  )
-
-  install(CODE "execute_process(COMMAND ${fetch_rte_examples_data_command})")
-  install(
-    FILES # cmake-format: sort
-          ${RTE_EXAMPLES_DATA}/ckdmip-states.nc
-          ${RTE_EXAMPLES_DATA}/rce-states.nc
-          ${RTE_EXAMPLES_DATA}/rfmip-states.nc
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/rte-rrtmgp/
+    NAME fetch_rte_examples_data
+    COMMAND
+      ${CMAKE_COMMAND} -D DATA_DIR=${RTE_EXAMPLES_DATA} -D
+      DATA_LABEL=rte-examples -D
+      "DATA_FILES=ckdmip-states.nc;rce-states.nc;rfmip-states.nc" -P
+      ${PROJECT_SOURCE_DIR}/cmake/CheckData.cmake
   )
 endif()
 
@@ -132,22 +126,26 @@ foreach(scheme IN ITEMS rrtmgp ssm ddq)
                    FIXTURES_SETUP
                    "run_rte_examples_${scheme}_${band}_${state}"
       )
-
-      add_test(
-        NAME check_rte_examples_${scheme}_${band}_${state}
-        COMMAND
-          ${Python3_EXECUTABLE}
-          ${CMAKE_SOURCE_DIR}/examples/compare-to-reference.py --ref_dir
-          ${data_dir}/examples/rte-examples/reference --tst_dir
-          ${CMAKE_CURRENT_BINARY_DIR} --file_names ${output_data}
-          --failure_threshold ${FAILURE_THRESHOLD}
-      )
-      set_tests_properties(
-        check_rte_examples_${scheme}_${band}_${state}
-        PROPERTIES
-          FIXTURES_REQUIRED
-          "fetch_${scheme}_data;run_rte_examples_${scheme}_${band}_${state}"
-      )
     endforeach()
+  endforeach()
+
+  foreach(state IN ITEMS rfmip ckdmip rce)
+    add_test(
+      NAME check_rte_examples_${scheme}_${state}
+      COMMAND
+        ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/examples/compare-to-reference.py --ref_dir
+        ${data_dir}/examples/rte-examples/reference --tst_dir
+        ${CMAKE_CURRENT_BINARY_DIR} --file_names
+        ${CMAKE_CURRENT_BINARY_DIR}/${scheme}-lw-${state}.nc
+        ${CMAKE_CURRENT_BINARY_DIR}/${scheme}-sw-${state}.nc
+        --failure_threshold ${FAILURE_THRESHOLD}
+    )
+    set_tests_properties(
+      check_rte_examples_${scheme}_${state}
+      PROPERTIES
+        FIXTURES_REQUIRED
+        "fetch_ssm_data;run_rte_examples_${scheme}_lw_${state};run_rte_examples_${scheme}_sw_${state}"
+    )
   endforeach()
 endforeach()

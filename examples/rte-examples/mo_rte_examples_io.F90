@@ -177,33 +177,40 @@ contains
 
     integer :: ncid
     real(wp), dimension(ncol, nlay+1, nvar) :: temp
+    character(len=3) :: prefix = "lw_"
+    ! Eventually prefix = associated(fluxes%flux_dn_dir) ? "lw_":"sw_"
+    ! But that's the 2023 Fortran standard...
+
+    ! -----------------------
+    if(associated(fluxes%flux_dn_dir))  prefix = "sw_"
 
     if(nf90_create(trim(solution_file), NF90_NETCDF4, ncid) /= NF90_NOERR) &
       call stop_on_err("Can't create file " // trim(solution_file))
+
 
     call create_dim(ncid, "col",    ncol/nVar)
     call create_dim(ncid, "layer",  nlay)
     call create_dim(ncid, "level",  nlay+1)
     call create_dim(ncid, "variant", nvar)
-    call create_var(ncid, "flux_up",                         &
+    call create_var(ncid, prefix // "flux_up",               &
                           ["col    ", "level  ", "variant"], &
                           [ncol/nvar, nlay+1, nvar])
-    call create_var(ncid, "flux_dn",                         &
+    call create_var(ncid, prefix // "flux_dn",               &
                           ["col    ", "level  ", "variant"], &
                           [ncol/nvar, nlay+1, nvar])
     call stop_on_err( &
-      write_field(ncid, "flux_up", to_variant(fluxes%flux_up)) &
+      write_field(ncid, prefix // "flux_up", to_variant(fluxes%flux_up)) &
     )
     call stop_on_err( &
-      write_field(ncid, "flux_dn", to_variant(fluxes%flux_dn)) &
+      write_field(ncid, prefix // "flux_dn", to_variant(fluxes%flux_dn)) &
     )
 
     if(associated(fluxes%flux_dn_dir)) then
-      call create_var(ncid, "flux_dir",                      &
+      call create_var(ncid, "sw_flux_dir",                      &
                         ["col    ", "level  ", "variant"],   &
                           [ncol/nvar, nlay+1, nvar])
       call stop_on_err( &
-        write_field(ncid, "flux_dir", to_variant(fluxes%flux_dn_dir)) &
+        write_field(ncid, "sw_flux_dir", to_variant(fluxes%flux_dn_dir)) &
       )
     end if
 

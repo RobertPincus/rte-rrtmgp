@@ -41,12 +41,11 @@ if(RTE_BUILD_TESTING)
     set(SSM_DATA "${PROJECT_BINARY_DIR}/ssm-data")
 
     include(ExternalProject)
+    # Fetched at build time (part of the default ALL target) so the data is
+    # present before install and before ctest.
     ExternalProject_Add(
       ssm-data
-      GIT_REPOSITORY https://github.com/earth-system-radiation/ssm-data.git
-      GIT_TAG "main"
-      GIT_SHALLOW True
-      EXCLUDE_FROM_ALL True
+      URL https://github.com/earth-system-radiation/ssm-data/archive/refs/tags/v0.0.1.tar.gz
       PREFIX ssm-data-cmake
       SOURCE_DIR ${SSM_DATA}
       CONFIGURE_COMMAND ""
@@ -54,25 +53,19 @@ if(RTE_BUILD_TESTING)
       INSTALL_COMMAND ""
     )
 
-    set(fetch_ssm_data_command
-        ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config "$<CONFIG>"
-        --target ssm-data
-    )
-
-    add_test(NAME fetch_ssm_data COMMAND ${fetch_ssm_data_command})
-
     set(REF_DIR examples/rte-examples/reference)
 
-    install(CODE "execute_process(COMMAND ${fetch_ssm_data_command})")
-    install(
-      FILES # cmake-format: sort
-            ${SSM_DATA}/${REF_DIR}/ssm-lw-ckdmip.nc
-            ${SSM_DATA}/${REF_DIR}/ssm-lw-rce.nc
-            ${SSM_DATA}/${REF_DIR}/ssm-lw-rfmip.nc
-            ${SSM_DATA}/${REF_DIR}/ssm-sw-ckdmip.nc
-            ${SSM_DATA}/${REF_DIR}/ssm-sw-rce.nc
-            ${SSM_DATA}/${REF_DIR}/ssm-sw-rfmip.nc
-      DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/rte-rrtmgp/
+    # The build already fetched the data (ssm-data is part of the ALL target).
+    # This fixture verifies the files are present before any test that needs
+    # them runs, and fails with an actionable message if the project was not
+    # built first.
+    add_test(
+      NAME fetch_ssm_data
+      COMMAND
+        ${CMAKE_COMMAND} -D DATA_DIR=${SSM_DATA}/${REF_DIR} -D DATA_LABEL=SSM
+        -D
+        "DATA_FILES=ssm-lw-ckdmip.nc;ssm-lw-rce.nc;ssm-lw-rfmip.nc;ssm-sw-ckdmip.nc;ssm-sw-rce.nc;ssm-sw-rfmip.nc"
+        -P ${PROJECT_SOURCE_DIR}/cmake/CheckData.cmake
     )
   endif()
 

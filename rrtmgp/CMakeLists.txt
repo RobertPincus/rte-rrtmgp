@@ -11,12 +11,11 @@ else()
   set(RRTMGP_DATA "${PROJECT_BINARY_DIR}/rrtmgp-data")
 
   include(ExternalProject)
+  # Fetched at build time (part of the default ALL target) so the data is
+  # present before install and before ctest.
   ExternalProject_Add(
     rrtmgp-data
-    GIT_REPOSITORY https://github.com/earth-system-radiation/rrtmgp-data.git
-    GIT_TAG "v1.9"
-    GIT_SHALLOW True
-    EXCLUDE_FROM_ALL True
+    URL https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.9.1.tar.gz
     PREFIX rrtmgp-data-cmake
     SOURCE_DIR ${RRTMGP_DATA}
     CONFIGURE_COMMAND ""
@@ -24,14 +23,18 @@ else()
     INSTALL_COMMAND ""
   )
 
-  set(fetch_rrtmgp_data_command
-      ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --config "$<CONFIG>"
-      --target rrtmgp-data
+  # The build already fetched the data (rrtmgp-data is part of the ALL target).
+  # This fixture verifies the files are present before any test that needs them
+  # runs, and fails with an actionable message if the project was not built
+  # first.
+  add_test(
+    NAME fetch_rrtmgp_data
+    COMMAND
+      ${CMAKE_COMMAND} -D DATA_DIR=${RRTMGP_DATA} -D DATA_LABEL=RRTMGP -D
+      "DATA_FILES=rrtmgp-aerosols-merra-lw.nc;rrtmgp-aerosols-merra-sw.nc;rrtmgp-clouds-lw-bnd.nc;rrtmgp-clouds-sw-bnd.nc;rrtmgp-gas-lw-g128.nc;rrtmgp-gas-lw-g256.nc;rrtmgp-gas-sw-g112.nc;rrtmgp-gas-sw-g224.nc"
+      -P ${PROJECT_SOURCE_DIR}/cmake/CheckData.cmake
   )
 
-  add_test(NAME fetch_rrtmgp_data COMMAND ${fetch_rrtmgp_data_command})
-
-  install(CODE "execute_process(COMMAND ${fetch_rrtmgp_data_command})")
   install(
     FILES # cmake-format: sort
           ${RRTMGP_DATA}/rrtmgp-aerosols-merra-lw.nc
@@ -44,12 +47,15 @@ else()
           ${RRTMGP_DATA}/rrtmgp-gas-sw-g224.nc
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/rte-rrtmgp/
   )
-
-  set_tests_properties(
-    fetch_rrtmgp_data PROPERTIES FIXTURES_SETUP fetch_rrtmgp_data
-  )
 endif()
+
+set_tests_properties(
+  fetch_rrtmgp_data PROPERTIES FIXTURES_SETUP fetch_rrtmgp_data
+)
 
 # Propagate the resolved value to the parent so sibling subdirectories
 # (examples, tests) inherit it.
-set(RRTMGP_DATA "${RRTMGP_DATA}" PARENT_SCOPE)
+set(RRTMGP_DATA
+    "${RRTMGP_DATA}"
+    PARENT_SCOPE
+)
