@@ -110,7 +110,7 @@ contains
                   * (play(icol, ilay)/mtckd_p0) * (1._wp - vmr)       &
                   * mtckd_cfrgn(igas, inu)
             ! nu supplied in kaysers (cm^-1); convert to MKS for tanh argument; 
-            ! R needs to be in units cm as cself and cfrgn are in of m^2/molecule cm^-1
+            ! R needs to be in units cm^-1 as cself and cfrgn are in of m^2/molecule cm
             ! R * (cself + cfrgn) is in units of m^2/molecule
             R = nus(inu) &
               * tanh((planck_h * lightspeed * 100._wp * nus(inu)) &
