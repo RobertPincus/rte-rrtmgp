@@ -103,7 +103,7 @@ contains
           !
           do igas = 1, mtckd_ngas
             vmr = vmrs(mtckd_num_index(igas), icol, ilay)
-            cself = (mtckd_T0/tlay(icol, ilay))**(mtckd_n(igas, inu)) &
+            cself = (mtckd_T0/tlay(icol, ilay))**(1._wp + mtckd_n(igas, inu)) &
                   * (play(icol, ilay)/mtckd_p0) * vmr                 &
                   * mtckd_cself(igas, inu)
             cfrgn = (mtckd_T0/tlay(icol, ilay))                       &
