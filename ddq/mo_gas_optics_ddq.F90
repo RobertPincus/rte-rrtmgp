@@ -393,11 +393,12 @@ contains
                                                  this%species_names),  &
                                  igas = 1, size(provided_gases))])
 
-    ! vmr array, index 0 is the
-    allocate(vmrs(0:size(gases_to_use), ncol, nlay))
-    call zero_array(ncol, nlay, vmrs(0,:,:))
+    ! vmr array, gas index 0 stands in for gases users haven't supplied (vmr = 0);
+    ! column dimension first for unit-stride access in the kernel
+    allocate(vmrs(ncol, nlay, 0:size(gases_to_use)))
+    call zero_array(ncol, nlay, vmrs(:,:,0))
     do igas = 1, size(gases_to_use)
-      error_msg = gas_desc%get_vmr(gases_to_use(igas), vmrs(igas,:,:))
+      error_msg = gas_desc%get_vmr(gases_to_use(igas), vmrs(:,:,igas))
       if (error_msg /= "") return
     end do
 
@@ -427,7 +428,7 @@ contains
       dry_num => dry_num_arr
       idx_h2o = string_loc_in_array("h2o", gases_to_use)
       dry_num_arr = get_layer_number(ncol, nlay,       &
-                                    vmrs(idx_h2o,:,:), &
+                                    vmrs(:,:,idx_h2o), &
                                     plev)
                                      ! dry air column amounts computation
     end if

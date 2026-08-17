@@ -24,9 +24,9 @@ contains
     real(wp), intent(in)  :: nus(nnu)
     real(wp), dimension(     ncol, nlay), &
               intent(in)  :: play, tlay, dry_num
-! VMRs might need to start at ngas = 0, with element 0 having value 0, to stand in for gases users haven't supplied
-!   otherwise we need to filter the
-    real(wp), intent(in)  :: vmrs(0:ngas, ncol, nlay)
+! VMRs start at ngas = 0, with element 0 having value 0, to stand in for gases users haven't supplied.
+! Column dimension first so the vectorized icol loops below read with unit stride.
+    real(wp), intent(in)  :: vmrs(ncol, nlay, 0:ngas)
 
     ! Functional approximations to cross-sections
     integer,  intent(in) :: fax_ngas
@@ -51,75 +51,116 @@ contains
     real(wp), intent(out) :: tau(ncol, nlay, nnu)
     ! -----------------
     integer  :: igas, icol, ilay, inu
-    real(wp) :: vmr, num_density
-    real(wp) :: t, x, P_scale, T_scale, pres, delta_T
+    real(wp) :: vmr
+    real(wp) :: x, P_scale, T_scale, delta_T
     real(wp) :: cself, cfrgn, R ! MT_CKD
+    ! Per-(igas,inu) coefficients hoisted to scalars
+    real(wp) :: c0, c1, c2, xh, a0, a1, a2, b0, b1, b2, sig0
+    real(wp) :: q0, q1, q2, q3
+    real(wp) :: cs, cf, en, nu_c
+    ! Per-layer invariants, computed once per (icol,igas) instead of once
+    ! per (icol,igas,inu): all logs and divisions below are nu-independent.
+    real(wp) :: acc    (ncol)
+    real(wp) :: fax_x  (ncol, fax_ngas), fax_dT(ncol, fax_ngas), fax_w(ncol, fax_ngas)
+    real(wp) :: xsec_w (ncol, xsec_ngas)
+    real(wp) :: mt_tr  (ncol, mtckd_ngas), mt_logr(ncol, mtckd_ngas), &
+                mt_ps  (ncol, mtckd_ngas), mt_pf  (ncol, mtckd_ngas), &
+                mt_w   (ncol, mtckd_ngas)
+    real(wp) :: inv_2kT(ncol)
 
-    do inu = 1, nnu
-      do ilay = 1, nlay
+    do ilay = 1, nlay
+      !
+      ! Hoist all nu-independent quantities out of the spectral loop
+      !
+      do igas = 1, fax_ngas
         do icol = 1, ncol
-          num_density = dry_num(icol, ilay)
-          t = 0
-          !
-          ! Functional approximation to cross-sections
-          !
-          do igas = 1, fax_ngas
-            vmr = vmrs(fax_num_index(igas), icol, ilay)
-            ! Increase pressure to account for self-broadening
-            pres = play(icol, ilay) * (1 + vmr * fax_S(igas))
-            x = log(pres/fax_p0(igas))
-            ! fax_c(3,:,:) is the hinge point x_h
-            P_scale =                  &
-                   fax_c(0, igas, inu) &
-                +  fax_c(1, igas, inu) * x &
-                + (fax_c(2, igas, inu) - fax_c(1, igas, inu)) &
-                  * max(x - fax_c(3, igas, inu), 0._wp)
-            delta_T = tlay(icol, ilay) - fax_T0(igas)
-            T_scale =                            &
-                (fax_a(0, igas, inu)             &
-                +fax_a(1, igas, inu)*delta_T     &
-                +fax_a(2, igas, inu)*delta_T**2) &
-              / (fax_b(0, igas, inu)             &
-                +fax_b(1, igas, inu)*delta_T     &
-                +fax_b(2, igas, inu)*delta_T**2)
-            t = t &
-              + (fax_sigma0(igas, inu) * exp(P_scale + T_scale)) & ! cross-section [m**2/mol]
-              * (vmr * num_density)                    ! Integrated number density [mol/m**2]
+          vmr = vmrs(icol, ilay, fax_num_index(igas))
+          ! Increase pressure to account for self-broadening
+          fax_x (icol, igas) = log(play(icol, ilay) * (1 + vmr * fax_S(igas)) / fax_p0(igas))
+          fax_dT(icol, igas) = tlay(icol, ilay) - fax_T0(igas)
+          fax_w (icol, igas) = vmr * dry_num(icol, ilay)   ! Integrated number density [mol/m**2]
+        end do
+      end do
+      do igas = 1, xsec_ngas
+        do icol = 1, ncol
+          xsec_w(icol, igas) = vmrs(icol, ilay, xsec_num_index(igas)) * dry_num(icol, ilay)
+        end do
+      end do
+      do igas = 1, mtckd_ngas
+        do icol = 1, ncol
+          vmr = vmrs(icol, ilay, mtckd_num_index(igas))
+          mt_tr  (icol, igas) = mtckd_T0/tlay(icol, ilay)
+          mt_logr(icol, igas) = log(mt_tr(icol, igas))
+          mt_ps  (icol, igas) = (play(icol, ilay)/mtckd_p0) * vmr
+          mt_pf  (icol, igas) = (play(icol, ilay)/mtckd_p0) * (1._wp - vmr)
+          mt_w   (icol, igas) = vmr * dry_num(icol, ilay)
+        end do
+      end do
+      do icol = 1, ncol
+        inv_2kT(icol) = (planck_h * lightspeed * 100._wp) &
+                      / (2._wp * boltzmann_k * tlay(icol, ilay))
+      end do
+
+      do inu = 1, nnu
+        acc(1:ncol) = 0._wp
+        !
+        ! Functional approximation to cross-sections
+        !
+        do igas = 1, fax_ngas
+          ! fax_c(3,:,:) is the hinge point x_h
+          c0 = fax_c(0, igas, inu); c1 = fax_c(1, igas, inu)
+          c2 = fax_c(2, igas, inu); xh = fax_c(3, igas, inu)
+          a0 = fax_a(0, igas, inu); a1 = fax_a(1, igas, inu); a2 = fax_a(2, igas, inu)
+          b0 = fax_b(0, igas, inu); b1 = fax_b(1, igas, inu); b2 = fax_b(2, igas, inu)
+          sig0 = fax_sigma0(igas, inu)
+          do icol = 1, ncol
+            x       = fax_x (icol, igas)
+            delta_T = fax_dT(icol, igas)
+            P_scale = c0 + c1 * x + (c2 - c1) * max(x - xh, 0._wp)
+            T_scale = (a0 + a1*delta_T + a2*delta_T**2) &
+                    / (b0 + b1*delta_T + b2*delta_T**2)
+            acc(icol) = acc(icol) &
+              + (sig0 * exp(P_scale + T_scale)) & ! cross-section [m**2/mol]
+              * fax_w(icol, igas)
           end do
-          !
-          ! Cross-sections pressure and temperature dependence following doi:10.1029/2022MS003239
-          !
-          do igas = 1, xsec_ngas
-            vmr = vmrs(xsec_num_index(igas), icol, ilay)
-            t = t &
-              + (xsec_p(0, igas, inu) &
-                + xsec_p(1, igas, inu) * tlay(icol, ilay)    &
-                + xsec_p(2, igas, inu) * tlay(icol, ilay)**2 &
-                + xsec_p(3, igas, inu) * play(icol, ilay))    &
-              * (vmr * num_density)
+        end do
+        !
+        ! Cross-sections pressure and temperature dependence following doi:10.1029/2022MS003239
+        !
+        do igas = 1, xsec_ngas
+          q0 = xsec_p(0, igas, inu); q1 = xsec_p(1, igas, inu)
+          q2 = xsec_p(2, igas, inu); q3 = xsec_p(3, igas, inu)
+          do icol = 1, ncol
+            acc(icol) = acc(icol) &
+              + (q0 + q1 * tlay(icol, ilay)    &
+                    + q2 * tlay(icol, ilay)**2 &
+                    + q3 * play(icol, ilay))   &
+              * xsec_w(icol, igas)
           end do
-          !
-          ! MT_CKD continuum
-          !
-          do igas = 1, mtckd_ngas
-            vmr = vmrs(mtckd_num_index(igas), icol, ilay)
-            cself = (mtckd_T0/tlay(icol, ilay))**(1._wp + mtckd_n(igas, inu)) &
-                  * (play(icol, ilay)/mtckd_p0) * vmr                 &
-                  * mtckd_cself(igas, inu)
-            cfrgn = (mtckd_T0/tlay(icol, ilay))                       &
-                  * (play(icol, ilay)/mtckd_p0) * (1._wp - vmr)       &
-                  * mtckd_cfrgn(igas, inu)
-            ! nu supplied in kaysers (cm^-1); convert to MKS for tanh argument; 
+        end do
+        !
+        ! MT_CKD continuum
+        !
+        do igas = 1, mtckd_ngas
+          cs   = mtckd_cself(igas, inu)
+          cf   = mtckd_cfrgn(igas, inu)
+          en   = 1._wp + mtckd_n(igas, inu)
+          nu_c = nus(inu)
+          do icol = 1, ncol
+            ! (T0/T)**(1+n) written as exp((1+n)*log(T0/T)) with the log hoisted
+            cself = exp(en * mt_logr(icol, igas)) * mt_ps(icol, igas) * cs
+            cfrgn = mt_tr(icol, igas)             * mt_pf(icol, igas) * cf
+            ! nu supplied in kaysers (cm^-1); convert to MKS for tanh argument;
             ! R needs to be in units cm^-1 as cself and cfrgn are in of m^2/molecule cm
             ! R * (cself + cfrgn) is in units of m^2/molecule
-            R = nus(inu) &
-              * tanh((planck_h * lightspeed * 100._wp * nus(inu)) &
-                     / (2._wp * boltzmann_k * tlay(icol, ilay)))
-           t = t                   &
-             + R * (cself + cfrgn) &
-             * (vmr * num_density)
+            R = nu_c * tanh(nu_c * inv_2kT(icol))
+            acc(icol) = acc(icol)   &
+              + R * (cself + cfrgn) &
+              * mt_w(icol, igas)
           end do
-          tau(icol, ilay, inu) = MAX(0._wp, t)
+        end do
+        do icol = 1, ncol
+          tau(icol, ilay, inu) = MAX(0._wp, acc(icol))
         end do
       end do
     end do
