@@ -39,7 +39,6 @@ module mo_gas_optics_ddq
                                    fax_norder, fax_nterms, xsec_nterms
   implicit none
   private
-  public :: ty_gas_optics_ddq
 
   integer, parameter :: gas_name_len = 8
   ! -------------------------------------------------------------------------------------------------
