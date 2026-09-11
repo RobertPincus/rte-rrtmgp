@@ -42,7 +42,7 @@ contains
     character(len=gas_name_len), allocatable :: fax_species_names(:)
     real(wp), allocatable :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
     real(wp), allocatable :: fax_T0(:)       ! (nspecies)
-    real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
+    real(wp), allocatable :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
     real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     real(wp), allocatable :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), allocatable :: fax_S(:)        ! (     nspecies), self-broadening coefficients

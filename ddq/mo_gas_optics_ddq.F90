@@ -61,7 +61,7 @@ module mo_gas_optics_ddq
     !
     ! Pressure dependence
     !
-    real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
+    real(wp), allocatable :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
     real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     !
     ! Reference cross-section, self-broadening factor
@@ -465,7 +465,7 @@ contains
     character(len=*), intent(in) :: fax_species_names(:)
     real(wp), intent(in) :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
     real(wp), intent(in) :: fax_T0(:)       ! (nspecies)
-    real(wp), intent(in) :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
+    real(wp), intent(in) :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
     real(wp), intent(in) :: fax_p0(:)       ! (nspecies)
     real(wp), intent(in) :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), intent(in) :: fax_S(:)        ! (     nspecies), self-broadening coefficients
