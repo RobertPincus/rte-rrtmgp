@@ -42,10 +42,11 @@ contains
     character(len=gas_name_len), allocatable :: fax_species_names(:)
     real(wp), allocatable :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
     real(wp), allocatable :: fax_T0(:)       ! (nspecies)
-    real(wp), allocatable :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
+    real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
     real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     real(wp), allocatable :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), allocatable :: fax_S(:)        ! (     nspecies), self-broadening coefficients
+    real(wp), allocatable :: fax_vmr0(:)     ! (     nspecies), reference volume mixing ratios
     ! -------------------------------------
     ! cross-section fits (xsec)
     character(len=gas_name_len), allocatable :: xsec_species_names(:)
@@ -94,6 +95,7 @@ contains
     fax_T0 = read_field(ncid, 'fax_T0', fax_nspecies)
     fax_p0 = read_field(ncid, 'fax_p0', fax_nspecies)
     fax_S  = read_field(ncid, 'fax_S',  fax_nspecies)
+    fax_vmr0 = read_field(ncid, 'fax_vmr0', fax_nspecies)
     fax_sigma0 = read_field(ncid, 'fax_sigma0', fax_nspecies, nnu)
 
     xsec_species_names  = read_char_vec(ncid, 'xsec_species_names',  xsec_nspecies)
@@ -120,14 +122,14 @@ contains
       solar_source = read_field(ncid, 'solar_spectral_irradiance', nnu)
       call stop_on_err(gas_optics%load( &
                       nus, weights,     &
-                      fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
+                      fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, fax_vmr0, &
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
                       rayleigh_xsec, solar_source))
     else
       call stop_on_err(gas_optics%load( &
                       nus, weights,     &
-                      fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
+                      fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, fax_vmr0, &
                       xsec_species_names, xsec_p, &
                       mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0))
     end if

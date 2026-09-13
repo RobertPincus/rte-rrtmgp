@@ -61,13 +61,14 @@ module mo_gas_optics_ddq
     !
     ! Pressure dependence
     !
-    real(wp), allocatable :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
+    real(wp), allocatable :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
     real(wp), allocatable :: fax_p0(:)       ! (nspecies)
     !
     ! Reference cross-section, self-broadening factor
     !
     real(wp), allocatable :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), allocatable :: fax_S(:)        ! (     nspecies), self-broadening coefficients
+    real(wp), allocatable :: fax_vmr0(:)     ! (     nspecies), reference volume mixing ratios
     ! -------------------------------------
     ! cross-section fits (xsec)
     ! -------------------------------------
@@ -436,7 +437,7 @@ contains
                   this%nus, &
                   play, tlay, dry_num, vmrs, &
                   size(fax_num_index), fax_num_index,   &
-                  this%fax_a, this%fax_b, this%fax_T0, this%fax_c, this%fax_p0, this%fax_sigma0, this%fax_S, &
+                  this%fax_a, this%fax_b, this%fax_T0, this%fax_c, this%fax_p0, this%fax_sigma0, this%fax_S, this%fax_vmr0, &
                   size(xsec_num_index), xsec_num_index,  &
                   this%xsec_p,                           &
                   size(mtckd_num_index), mtckd_num_index, &
@@ -451,7 +452,7 @@ contains
   !
   function load(this,                       &
                 nus, weights, &
-                fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
+                fax_species_names, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, fax_vmr0, &
                 xsec_species_names, xsec_p, &
                 mtckd_species_names, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
                 rayleigh_xsec, solar_source) &
@@ -465,10 +466,11 @@ contains
     character(len=*), intent(in) :: fax_species_names(:)
     real(wp), intent(in) :: fax_a(:,:,:), fax_b(:,:,:) ! (0:2, nspecies, nnu)
     real(wp), intent(in) :: fax_T0(:)       ! (nspecies)
-    real(wp), intent(in) :: fax_c(:,:,:)    ! (0:4, nspecies, nnu)
+    real(wp), intent(in) :: fax_c(:,:,:)    ! (0:3, nspecies, nnu)
     real(wp), intent(in) :: fax_p0(:)       ! (nspecies)
     real(wp), intent(in) :: fax_sigma0(:,:) ! (     nspecies, nnu), reference absorption coefficient at p_0, T_0
     real(wp), intent(in) :: fax_S(:)        ! (     nspecies), self-broadening coefficients
+    real(wp), intent(in) :: fax_vmr0(:)     ! (     nspecies), reference volume mixing ratios
     ! -------------------------------------
     ! cross-section fits (xsec)
     character(len=*), intent(in) :: xsec_species_names(:)
@@ -516,8 +518,9 @@ contains
       error_msg = "Wrong dimensions for fax_sigma0"
     if (.not. extents_are(fax_T0, fax_nspecies) .or. &
         .not. extents_are(fax_p0, fax_nspecies) .or. &
+        .not. extents_are(fax_vmr0, fax_nspecies) .or. &
         .not. extents_are(fax_S,  fax_nspecies)) &
-      error_msg = "fax_T0, fax_p0, fax_S depend only on species"
+      error_msg = "fax_T0, fax_p0, fax_vmr0, fax_S depend only on species"
 
     if(xsec_nspecies > 0) then
       if (.not. extents_are(xsec_p, xsec_nterms+1, xsec_nspecies, nnu)) &
@@ -550,13 +553,15 @@ contains
              this%fax_b(0:fax_norder, fax_nspecies, nnu), &
              this%fax_c(0:fax_nterms, fax_nspecies, nnu), &
              this%fax_sigma0(         fax_nspecies, nnu), &
-             this%fax_S (             fax_nspecies))
+             this%fax_S (             fax_nspecies),      &
+             this%fax_vmr0(           fax_nspecies))
     this%fax_species_names = fax_species_names
     this%fax_a = fax_a
     this%fax_b = fax_b
     this%fax_c = fax_c
     this%fax_sigma0 = fax_sigma0
     this%fax_S  = fax_S
+    this%fax_vmr0 = fax_vmr0
     this%fax_T0 = fax_T0
     this%fax_p0 = fax_p0
 

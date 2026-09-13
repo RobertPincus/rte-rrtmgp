@@ -5,7 +5,7 @@ module mo_gas_optics_ddq_kernels
   implicit none
   private
   public :: tau_absorption_from_fits, add_tau_rayleigh
-  integer, parameter, public :: fax_norder = 2, fax_nterms = 4, xsec_nterms = 3
+  integer, parameter, public :: fax_norder = 2, fax_nterms = 3, xsec_nterms = 3
 
 contains
   !--------------------------------------------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ contains
   subroutine tau_absorption_from_fits(ncol, nlay, nnu, ngas, &
                   nus, &
                   play, tlay, dry_num, vmrs, &
-                  fax_ngas, fax_num_index, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, &
+                  fax_ngas, fax_num_index, fax_a, fax_b, fax_T0, fax_c, fax_p0, fax_sigma0, fax_S, fax_vmr0, &
                   xsec_ngas, xsec_num_index, xsec_p, &
                   mtckd_ngas, mtckd_num_index, mtckd_cself, mtckd_cfrgn, mtckd_n, mtckd_T0, mtckd_p0, &
                   tau) bind(C, name="ddq_compute_tau_absorption")
@@ -33,10 +33,10 @@ contains
     integer,  intent(in) :: fax_num_index(fax_ngas)
     real(wp), dimension(0:2, fax_ngas, nnu), &
               intent(in)  :: fax_a, fax_b
-    real(wp), intent(in)  :: fax_c(0:4, fax_ngas, nnu)
+    real(wp), intent(in)  :: fax_c(0:3, fax_ngas, nnu)
     real(wp), intent(in)  :: fax_sigma0(fax_ngas, nnu)
     real(wp), dimension(fax_ngas) &
-                          :: fax_S, fax_T0, fax_p0
+                          :: fax_S, fax_T0, fax_p0, fax_vmr0
     ! Cross-section fits
     integer,  intent(in) :: xsec_ngas
     integer,  intent(in) :: xsec_num_index(xsec_ngas)
@@ -52,10 +52,10 @@ contains
     ! -----------------
     integer  :: igas, icol, ilay, inu
     real(wp) :: vmr
-    real(wp) :: x, P_den, T_scale, delta_T
+    real(wp) :: x, w, P_scale, T_scale, delta_T
     real(wp) :: cself, cfrgn, R ! MT_CKD
     ! Per-(igas,inu) coefficients hoisted to scalars
-    real(wp) :: c0, c1, c2, cl, xh, a0, a1, a2, b0, b1, b2, sig0
+    real(wp) :: cm1, c0, c1, xh, lin, a0, a1, a2, b0, b1, b2, sig0
     real(wp) :: q0, q1, q2, q3
     real(wp) :: cs, cf, en, nu_c
     ! Per-layer invariants, computed once per (icol,igas) instead of once
@@ -76,7 +76,9 @@ contains
         do icol = 1, ncol
           vmr = vmrs(icol, ilay, fax_num_index(igas))
           ! Increase pressure to account for self-broadening
-          fax_x (icol, igas) = play(icol, ilay) * (1 + vmr * fax_S(igas)) / fax_p0(igas)
+          fax_x (icol, igas) = play(icol, ilay) / fax_p0(igas)         &
+                             * (1._wp + vmr            * fax_S(igas)) &
+                             / (1._wp + fax_vmr0(igas) * fax_S(igas))
           fax_dT(icol, igas) = tlay(icol, ilay) - fax_T0(igas)
           fax_w (icol, igas) = vmr * dry_num(icol, ilay)   ! Integrated number density [mol/m**2]
         end do
@@ -107,21 +109,24 @@ contains
         ! Functional approximation to cross-sections
         !
         do igas = 1, fax_ngas
-          ! fax_c(4,:,:) is the hinge point x_h
-          c0 = fax_c(0, igas, inu); c1 = fax_c(1, igas, inu); c2 = fax_c(2, igas, inu);
-          cl = fax_c(3, igas, inu); xh = fax_c(4, igas, inu)
+          ! Laurent weights of the near-line reciprocal, summing to 1 at w = 1
+          cm1 = fax_c(0, igas, inu) * fax_c(1, igas, inu)
+          c0  = fax_c(0, igas, inu) - cm1
+          c1  = 1._wp - fax_c(0, igas, inu)
+          xh  = fax_c(2, igas, inu); lin = fax_c(3, igas, inu)
           a0 = fax_a(0, igas, inu); a1 = fax_a(1, igas, inu); a2 = fax_a(2, igas, inu)
           b0 = fax_b(0, igas, inu); b1 = fax_b(1, igas, inu); b2 = fax_b(2, igas, inu)
           sig0 = fax_sigma0(igas, inu)
           do icol = 1, ncol
-            x       = fax_x(icol,igas) + xh
+            x       = fax_x(icol, igas)
             delta_T = fax_dT(icol, igas)
-            P_den   = c0 + x * (c1 + c2 * x)
+            w       = (x + xh) / (1._wp + xh)
+            P_scale = lin * x + (1._wp - lin) / (cm1 / w + c0 + c1 * w)
             T_scale = (a0 + a1*delta_T + a2*delta_T**2) &
                     / (b0 + b1*delta_T + b2*delta_T**2)
             acc(icol) = acc(icol) &
               + sig0 * max( &
-                  x * (1._wp + cl * P_den) / P_den * T_scale, &
+                  P_scale * T_scale, &
                   0._wp) & ! cross-section [m**2/mol]
               * fax_w(icol, igas)
           end do
